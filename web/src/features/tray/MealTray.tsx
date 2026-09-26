@@ -10,6 +10,9 @@ import { ItemDetail } from '../item-detail/ItemDetail'
 import { GroupTag } from '../../ui/GroupTag'
 import { RarityBadge, rarityColor } from '../../ui/RarityBadge'
 import { BURST_MS, RarityBurst } from '../../ui/RarityBurst'
+import { rarityFeedback } from '../../ui/feedback'
+import { useSoundEnabled } from '../../ui/preferences'
+import { preloadSounds, unlockAudio } from '../../ui/sound'
 import { useReducedMotion } from '../../ui/useReducedMotion'
 import { MAX_SLOTS, useTrayStore, type DrawFn, type TraySlot } from './store'
 import './MealTray.css'
@@ -72,6 +75,11 @@ export const REVEAL_FIRST_MS = 300
 export const REVEAL_STEP_MS = 500
 /** Thẻ cuối bật xong thì chờ chút rồi mới mở khoá mâm. */
 export const REVEAL_SETTLE_MS = 600
+
+/** Bậc cao nhất trong các ô có món (0 nếu không có). */
+function topRarity(slots: readonly TraySlot[]): 0 | 1 | 2 | 3 {
+  return slots.reduce<0 | 1 | 2 | 3>((m, s) => (s.status !== 'empty' && s.itemId && s.rarity && s.rarity > m ? s.rarity : m), 0)
+}
 
 /** Thẻ ⭐⭐⭐ bật chậm hơn một nhịp. */
 export const LEGEND_BEAT_MS = 300
@@ -210,9 +218,12 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
   const reducedMotion = useReducedMotion()
   // Đọc trong hẹn giờ: luôn là giá trị mới nhất (người dùng có thể bật Giảm chuyển động giữa chừng)
   const reducedRef = useRef(reducedMotion)
+  const [soundOn] = useSoundEnabled()
+  const soundRef = useRef(soundOn)
   useEffect(() => {
     reducedRef.current = reducedMotion
-  }, [reducedMotion])
+    soundRef.current = soundOn
+  }, [reducedMotion, soundOn])
   // Hiệu ứng theo bậc đang chạy trên từng ô
   const [bursts, setBursts] = useState<Record<string, Burst>>({})
   const burstSeq = useRef(0)
@@ -255,6 +266,8 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
       n += 1
       setShown(n)
       const r = rarities[n - 1]
+      // "bụp"/"ting" + rung đúng lúc thẻ bật
+      if (r) rarityFeedback(r, soundRef.current)
       if (r && !reducedRef.current) {
         playBurstRef.current(ids[n - 1], r)
         // chỉ giữ mâm chờ hiệu ứng ⭐⭐⭐ (chạm để bỏ qua); bậc thấp để tự tắt sau khi mở khoá
@@ -272,10 +285,19 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
     return () => window.clearTimeout(t)
   }, [revealing, finishReveal])
 
-  // Bỏ qua: hiện cả mâm, dừng mọi hiệu ứng đang chạy
+  // Bỏ qua: hiện cả mâm, dừng mọi hiệu ứng đang chạy; phản hồi một lần theo bậc cao nhất của các thẻ chưa bật
   function skipReveal() {
     setBursts({})
+    const top = topRarity(useTrayStore.getState().slots.slice(shown))
+    if (top) rarityFeedback(top, soundRef.current)
     finishReveal()
+  }
+
+  // Chạm trên mâm: mở khoá âm thanh ngay trong lần chạm (iOS; mâm mở lại sau khi tải lại trang)
+  function unlockOnTap() {
+    if (!soundRef.current) return
+    unlockAudio()
+    preloadSounds()
   }
 
   // 🎲: ô lật rồi chạy hiệu ứng theo bậc món mới. Mỗi ô một lần lật: chạm liên tục thì huỷ lần trước.
@@ -292,7 +314,16 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
       prev.anim?.cancel()
       flips.current.delete(slotId)
     }
-    if (reducedRef.current) return
+    const newRarity = () => {
+      const slot = useTrayStore.getState().slots.find((s) => s.id === slotId)
+      return slot ? rarityOf(slot) : null
+    }
+    if (reducedRef.current) {
+      // không lật: phản hồi ngay
+      const r = newRarity()
+      if (r) rarityFeedback(r, soundRef.current)
+      return
+    }
     const el = slotEls.current.get(slotId)
     // Web Animations: jsdom/trình duyệt cũ không có thì bỏ qua êm
     const anim = el?.animate?.(
@@ -306,9 +337,11 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
     const timer = window.setTimeout(() => {
       flips.current.delete(slotId)
       // món mới sau khi đổi (đọc lại store lúc lật xong)
-      const slot = useTrayStore.getState().slots.find((s) => s.id === slotId)
-      const r = slot ? rarityOf(slot) : null
-      if (r) playBurst(slotId, r)
+      const r = newRarity()
+      if (r) {
+        rarityFeedback(r, soundRef.current)
+        playBurst(slotId, r)
+      }
     }, FLIP_MS)
     flips.current.set(slotId, { timer, anim })
   }
@@ -517,6 +550,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                           aria-label={copy.tray.reroll(v.item.name)}
                           disabled={slot.locked}
                           onClick={() => {
+                            unlockOnTap()
                             rerollOne(slot.id, draw)
                             announce(slot.id)
                             flipThenBurst(slot.id)
@@ -555,9 +589,15 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                   type="button"
                   className="button-secondary"
                   onClick={() => {
+                    unlockOnTap()
                     commit.reset()
+                    const before = new Map(useTrayStore.getState().slots.map((s) => [s.id, s.itemId]))
                     rerollAll(draw)
                     announce()
+                    // cả mâm đổi (không lật từng ô): phản hồi một lần theo bậc cao nhất trong các ô vừa đổi
+                    const changed = useTrayStore.getState().slots.filter((s) => before.get(s.id) !== s.itemId)
+                    const top = topRarity(changed)
+                    if (top) rarityFeedback(top, soundRef.current)
                   }}
                 >
                   {copy.tray.rerollAll}

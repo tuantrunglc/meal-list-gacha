@@ -3,7 +3,7 @@ import { foodSeed } from '../src/sets/food/seed'
 import { ADMIN, API } from './env.ts'
 import { login } from './helpers.ts'
 
-type ItemRow = { id: string; seedKey: string; setKey: string; groupKey: string; household: string }
+type ItemRow = { id: string; seedKey: string; setKey: string; groupKey: string; household: string; name: string }
 
 async function authToken(page: Page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('pocketbase_auth') ?? '{}').token as string)
@@ -87,9 +87,14 @@ test('người ngoài household không đọc/tạo được món; chủ app kh�
   expect((await patch({ household: otherHousehold.id })).status()).toBeGreaterThanOrEqual(400)
   expect((await patch({ seedKey: 'khac' })).status()).toBeGreaterThanOrEqual(400)
   expect((await patch({ setKey: 'khac' })).status()).toBeGreaterThanOrEqual(400)
-  expect((await patch({ name: 'Đổi tên được' })).ok()).toBe(true)
-  const del = await request.delete(`${API}/collections/items/records/${target.id}`, { headers: { Authorization: ownerToken } })
-  expect(del.status()).toBeGreaterThanOrEqual(400)
+  try {
+    expect((await patch({ name: 'Đổi tên được' })).ok()).toBe(true)
+    const del = await request.delete(`${API}/collections/items/records/${target.id}`, { headers: { Authorization: ownerToken } })
+    expect(del.status()).toBeGreaterThanOrEqual(400)
+  } finally {
+    // trả tên món seed để các test sau (thư viện, tìm kiếm) không phụ thuộc món nào bị chọn
+    expect((await patch({ name: target.name })).ok()).toBe(true)
+  }
 })
 
 test('khách không thấy món nào', async ({ request }) => {

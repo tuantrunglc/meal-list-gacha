@@ -7,6 +7,7 @@ import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { copy } from '../../ui/copy'
 import { useSoundEnabled } from '../../ui/preferences'
+import { playRaritySound, preloadSounds, unlockAudio } from '../../ui/sound'
 import { showToast } from '../../ui/toast'
 import './SettingsScreen.css'
 
@@ -127,7 +128,16 @@ export function SettingsScreen() {
             aria-checked={sound}
             aria-labelledby="sound-label"
             aria-describedby="sound-help"
-            onClick={() => setSound(!sound)}
+            onClick={() => {
+              const on = !sound
+              setSound(on)
+              if (on) {
+                // trong thao tác chạm: mở khoá audio, tải sẵn và phát thử
+                unlockAudio()
+                preloadSounds()
+                playRaritySound(2)
+              }
+            }}
           >
             <span className="settings__knob" aria-hidden="true" />
           </button>

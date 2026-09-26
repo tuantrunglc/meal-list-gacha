@@ -28,6 +28,9 @@ vi.mock('../../data/items', () => ({
   },
 }))
 
+const snd = vi.hoisted(() => ({ unlock: vi.fn(), preload: vi.fn(), play: vi.fn() }))
+vi.mock('../../ui/sound', () => ({ unlockAudio: snd.unlock, preloadSounds: snd.preload, playRaritySound: snd.play }))
+
 vi.mock('../../data/setConfig', () => ({
   useSetConfig: () => ({ ...config, refetch }),
   useSaveCooldown: () => ({ mutate, reset: vi.fn(), ...save }),
@@ -166,6 +169,16 @@ describe('SettingsScreen', () => {
     fireEvent.click(sw)
     expect(sw).toHaveAttribute('aria-checked', 'true')
     expect(window.localStorage.getItem('noi-than:sound')).toBe('on')
+    // bật: mở khoá audio trong lần chạm, tải sẵn, phát thử "ting"
+    expect(snd.unlock).toHaveBeenCalledTimes(1)
+    expect(snd.preload).toHaveBeenCalledTimes(1)
+    expect(snd.play).toHaveBeenCalledWith(2)
+    // iOS: mở khoá trước khi phát
+    expect(snd.unlock.mock.invocationCallOrder[0]).toBeLessThan(snd.play.mock.invocationCallOrder[0])
+    // tắt: im lặng
+    fireEvent.click(sw)
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    expect(snd.play).toHaveBeenCalledTimes(1)
   })
 
   describe('khôi phục món mặc định', () => {

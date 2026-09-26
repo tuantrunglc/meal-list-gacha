@@ -25,6 +25,9 @@ let recentState: { isPending: boolean; fetchStatus: string; error: AppError | nu
 }
 let hasDraws = false
 
+const fb = vi.hoisted(() => ({ feedback: vi.fn(), unlock: vi.fn(), preload: vi.fn() }))
+vi.mock('../../ui/feedback', () => ({ rarityFeedback: fb.feedback }))
+vi.mock('../../ui/sound', () => ({ unlockAudio: fb.unlock, preloadSounds: fb.preload, playRaritySound: vi.fn() }))
 const setConfigMock = vi.hoisted(() => ({ cooldownDays: null as number | null, loaded: true, failed: false, refetch: vi.fn() }))
 vi.mock('../../data/setConfig', () => ({
   useSetConfig: () => ({
@@ -105,6 +108,10 @@ describe('SpinScreen', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
     vi.setSystemTime(new Date(2026, 8, 26, 17, 0))
     refetch.mockClear()
+    fb.feedback.mockClear()
+    fb.unlock.mockClear()
+    fb.preload.mockClear()
+    window.localStorage.removeItem('noi-than:sound')
     useTrayStore.setState({ ...initialTray, open: false, slots: [], commitId: null })
     commitMutate.mockReset()
     commitState = { isPending: false, error: null }
@@ -829,6 +836,141 @@ describe('SpinScreen', () => {
         fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))
         act(() => vi.advanceTimersByTime(FLIP_MS))
         expect(bursts()).toHaveLength(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  })
+
+  describe('âm thanh và rung', () => {
+    const calls = () => fb.feedback.mock.calls.map(([r, sound]) => [r, sound])
+
+    it('âm thanh tắt (mặc định): không mở khoá/tải âm thanh; mỗi thẻ bật thì rung theo bậc, không tiếng', () => {
+      state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 2)) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinToTray()
+      expect(fb.unlock).not.toHaveBeenCalled()
+      expect(fb.preload).not.toHaveBeenCalled()
+      act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+      expect(calls()).toEqual([[2, false]])
+      act(() => vi.advanceTimersByTime(5000))
+      // đúng thứ tự bật: ⭐⭐, ⭐⭐, ⭐⭐⭐
+      expect(calls()).toEqual([
+        [2, false],
+        [2, false],
+        [3, false],
+      ])
+    })
+
+    it('âm thanh bật: chạm Mở nồi! thì mở khoá + tải sẵn; mỗi thẻ phát tiếng theo bậc', () => {
+      window.localStorage.setItem('noi-than:sound', 'on')
+      state = { ...state, data: toItems((d) => d.rarity === 1) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      expect(fb.unlock).toHaveBeenCalledTimes(1)
+      expect(fb.preload).toHaveBeenCalledTimes(1)
+      act(() => vi.advanceTimersByTime(1600))
+      act(() => vi.advanceTimersByTime(LID_LEAD_MS))
+      act(() => vi.advanceTimersByTime(5000))
+      expect(calls()).toEqual([
+        [1, true],
+        [1, true],
+        [1, true],
+      ])
+    })
+
+    it('bỏ qua giữa chừng: một phản hồi theo bậc cao nhất của các thẻ chưa bật (⭐⭐⭐ không bị nuốt); mở lại mâm cũ không phát', () => {
+      state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinToTray()
+      act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+      fireEvent.click(screen.getByTestId('reveal-skip'))
+      act(() => vi.advanceTimersByTime(5000))
+      expect(calls()).toEqual([
+        [1, false],
+        [3, false],
+      ])
+      fireEvent.click(screen.getByRole('button', { name: 'Để sau' }))
+      act(() => useTrayStore.setState({ open: true }))
+      act(() => vi.advanceTimersByTime(5000))
+      expect(fb.feedback).toHaveBeenCalledTimes(2)
+    })
+
+    it('âm thanh bật: 🎲 và Đổi cả mâm mở khoá âm thanh trong lần chạm; Đổi cả mâm phản hồi một lần theo bậc cao nhất', () => {
+      window.localStorage.setItem('noi-than:sound', 'on')
+      state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? true : d.rarity === 1)) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinAndWait()
+      act(() => vi.advanceTimersByTime(BURST_MS[3]))
+      fb.unlock.mockClear()
+      fb.feedback.mockClear()
+      const slot = useTrayStore.getState().slots[0]
+      const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+      fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))
+      expect(fb.unlock).toHaveBeenCalledTimes(1)
+      act(() => vi.advanceTimersByTime(FLIP_MS))
+      expect(calls()).toHaveLength(1)
+      expect(calls()[0][1]).toBe(true)
+      fb.feedback.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: 'Đổi cả mâm' }))
+      expect(fb.unlock).toHaveBeenCalledTimes(2)
+      const top = Math.max(...useTrayStore.getState().slots.map((sl) => sl.rarity ?? 0))
+      expect(calls()).toEqual([[top, true]])
+    })
+
+    it('giảm chuyển động + âm thanh bật: phản hồi có tiếng', () => {
+      window.localStorage.setItem('noi-than:sound', 'on')
+      vi.stubGlobal('matchMedia', (q: string) => ({
+        matches: q.includes('prefers-reduced-motion'),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }))
+      try {
+        state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
+        render(<SpinScreen />, { wrapper: MemoryRouter })
+        fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+        act(() => vi.advanceTimersByTime(310))
+        expect(calls()).toEqual([[3, true]])
+        const slot = useTrayStore.getState().slots[0]
+        const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+        fb.feedback.mockClear()
+        fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))
+        expect(calls()).toEqual([[1, true]])
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('🎲: phản hồi theo bậc món mới khi lật xong', () => {
+      state = { ...state, data: toItems((d) => d.rarity === 2) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinAndWait()
+      fb.feedback.mockClear()
+      const slot = useTrayStore.getState().slots[0]
+      const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+      fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))
+      expect(fb.feedback).not.toHaveBeenCalled()
+      act(() => vi.advanceTimersByTime(FLIP_MS))
+      expect(calls()).toEqual([[2, false]])
+    })
+
+    it('giảm chuyển động: một lần theo bậc cao nhất khi mâm hiện; 🎲 phản hồi ngay', () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({
+        matches: q.includes('prefers-reduced-motion'),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }))
+      try {
+        state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
+        render(<SpinScreen />, { wrapper: MemoryRouter })
+        fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+        act(() => vi.advanceTimersByTime(310))
+        expect(calls()).toEqual([[3, false]])
+        const slot = useTrayStore.getState().slots[0]
+        const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+        fb.feedback.mockClear()
+        fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))
+        expect(calls()).toEqual([[1, false]])
       } finally {
         vi.unstubAllGlobals()
       }

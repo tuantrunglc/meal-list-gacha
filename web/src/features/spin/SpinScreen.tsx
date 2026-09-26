@@ -9,6 +9,9 @@ import type { SetDefinition } from '../../sets/types'
 import { ChipGroup } from '../../ui/ChipGroup'
 import { copy } from '../../ui/copy'
 import { GachaPot } from '../../ui/GachaPot'
+import { rarityFeedback } from '../../ui/feedback'
+import { useSoundEnabled } from '../../ui/preferences'
+import { preloadSounds, unlockAudio } from '../../ui/sound'
 import { useReducedMotion } from '../../ui/useReducedMotion'
 import { ItemEditor, type EditorPrefill } from '../item-editor/ItemEditor'
 import { MealTray, trayAnnouncement } from '../tray/MealTray'
@@ -55,6 +58,7 @@ export function SpinScreen() {
   const [potFlash, setPotFlash] = useState<'rare' | 'legend' | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const reducedMotion = useReducedMotion()
+  const [soundOn] = useSoundEnabled()
   const showResult = useTrayStore((s) => s.showResult)
   const facetRefs = useRef<(HTMLDivElement | null)[]>([])
   const spinButton = useRef<HTMLButtonElement>(null)
@@ -90,6 +94,11 @@ export function SpinScreen() {
 
   function spin() {
     if (busy || !items.data) return
+    // Âm thanh phát sau (theo hẹn giờ): mở khoá audio ngay trong lần chạm này (iOS)
+    if (soundOn) {
+      unlockAudio()
+      preloadSounds()
+    }
     setCommittedNote(false)
     const snapshot = itemsById
     // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
@@ -106,9 +115,13 @@ export function SpinScreen() {
           // Dùng đúng danh sách món đã quay, không phụ thuộc lần tải lại sau đó
           setAnnouncement(trayAnnouncement(useTrayStore.getState().slots, set, snapshot))
         }
-        // Giảm chuyển động: hiện cả mâm (fade), nắp không bật
-        if (reducedMotion) return open()
         const rarities = result.slots.map((s) => s.rarity)
+        // Giảm chuyển động: hiện cả mâm (fade), nắp không bật; phản hồi một lần theo bậc cao nhất
+        if (reducedMotion) {
+          const top = rarities.reduce<0 | 1 | 2 | 3>((m, r) => (r && r > m ? r : m), 0)
+          if (top) rarityFeedback(top, soundOn)
+          return open()
+        }
         const legend = rarities.includes(3)
         // Nắp bật tung trước (⭐⭐: lóe xanh), mâm mở khi nắp lên tới đỉnh, rồi thẻ bật lần lượt
         const popLid = () => {

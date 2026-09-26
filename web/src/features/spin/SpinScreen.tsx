@@ -7,7 +7,7 @@ import { ChipGroup } from '../../ui/ChipGroup'
 import { copy } from '../../ui/copy'
 import { GachaPot } from '../../ui/GachaPot'
 import { useReducedMotion } from '../../ui/useReducedMotion'
-import { MealTray } from '../tray/MealTray'
+import { MealTray, trayAnnouncement } from '../tray/MealTray'
 import { useTrayStore } from '../tray/store'
 import './SpinScreen.css'
 
@@ -33,6 +33,7 @@ export function SpinScreen({ hasHistory = false }: Props) {
   const items = useItems(set)
   const [filters, setFilters] = useState(() => defaultFilters(set, new Date()))
   const [spinning, setSpinning] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
   const reducedMotion = useReducedMotion()
   const showResult = useTrayStore((s) => s.showResult)
   const facetRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -52,6 +53,7 @@ export function SpinScreen({ hasHistory = false }: Props) {
 
   function spin() {
     if (spinning || !items.data) return
+    const snapshot = itemsById
     // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
     const result = drawSlots({
       set,
@@ -69,6 +71,8 @@ export function SpinScreen({ hasHistory = false }: Props) {
       () => {
         setSpinning(false)
         showResult(result, removable)
+        // Dùng đúng danh sách món đã quay, không phụ thuộc lần tải lại sau đó
+        setAnnouncement(trayAnnouncement(useTrayStore.getState().slots, set, snapshot))
       },
       reducedMotion ? SPIN_MS_REDUCED : SPIN_MS,
     )
@@ -129,7 +133,7 @@ export function SpinScreen({ hasHistory = false }: Props) {
         {spinning ? copy.spin.spinning : copy.spin.button}
       </button>
 
-      <MealTray set={set} itemsById={itemsById} onChangeFilter={focusFilters} />
+      <MealTray set={set} itemsById={itemsById} onChangeFilter={focusFilters} announcement={announcement} />
     </div>
   )
 }

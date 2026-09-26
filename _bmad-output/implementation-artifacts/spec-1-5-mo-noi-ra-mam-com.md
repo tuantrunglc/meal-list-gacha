@@ -2,7 +2,7 @@
 title: 'Story 1.5: Mở nồi ra mâm cơm'
 type: 'feature'
 created: '2026-09-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: '69dc5c4a009af6130d689e3230d34f25e88dfeab'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -78,6 +78,28 @@ context:
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Nguồn | Finding | Verdict | Bằng chứng | Route |
+|---|---|---|---|---|---|
+| 1 | blind, edge, verif | Dialog `aria-modal` không giữ focus; đóng mâm không trả focus | medium | Tab ra được nút Quay/tab bar; focus rơi về body | patch — giữ Tab trong dialog, trả focus về chỗ cũ (trừ "Đổi mùa"); test |
+| 2 | blind, edge | aria-live nằm ngoài dialog `aria-modal` | medium | VoiceOver có thể bỏ qua | patch — vùng live trong dialog, nội dung đặt sau 50ms |
+| 3 | blind, edge | Rời tab Quay khi mâm mở, quay lại mâm tự bật | medium | Store toàn cục không đóng | patch — đóng mâm khi màn unmount; test |
+| 4 | edge | Ô có món nhưng món không còn trong danh sách → báo "Hết món" + "Đổi mùa" | low | Nhánh dựa vào `!item` | patch — phân biệt `empty` và `missing` |
+| 5 | blind, edge | `removable` không lấy từ `slotTemplate` | low | `showResult(result)` không truyền | patch |
+| 6 | edge | `ChipGroup` giá trị lệch → không chip nào nhận Tab | low | `tabIndex` chỉ theo selected | patch + test |
+| 7 | edge, blind | "Đổi mùa" giả định facet đầu / không có facet | low | `facetRefs.current[0]` | patch — facet đầu tiên có thật, không có thì focus nút Quay |
+| 8 | edge | Câu đọc dùng map món cũ | low | closure | patch — tính câu đọc từ đúng danh sách món đã quay |
+| 9 | verif, blind | Thiếu test: reduced-motion 300ms, câu đọc đầy đủ, ô trống đọc "hết món", ChipGroup phím mũi tên, quay đúng 1 lần | medium | Bỏ nhánh vẫn xanh | patch — thêm test |
+| 10 | blind | Nút "Bộ: Món ăn ▾" `disabled` nên bàn phím không biết | low | | patch — `aria-disabled` |
+| 11 | blind | `MealTray` subscribe cả store | low | Render thừa khi 1.6 thêm hành động | patch — selector |
+| 12 | edge | Ảnh upload `protected` cần file token | low | Chưa có ảnh upload tới Story 2.3 | reject — làm ở 2.3 |
+| 13 | edge | Safari < 14 thiếu `addEventListener` trên MediaQueryList | low | Ngoài phạm vi trình duyệt hỗ trợ | reject |
+| 14 | blind | Hoạ tiết nền có thể bị che (`z-index:-1`) | false | Ảnh chụp thấy hoạ tiết | reject |
+| 15 | blind | `RarityLevel` trùng kiểu `Rarity` của engine | low | `ui/` không được import `engine/` | reject |
+| 16 | blind | Tên món không dùng đúng token title; màu viết cứng trong SVG nồi | low | Theo kích thước của mock | reject |
+| 17 | blind | `min-height` lặp padding của `.app-main` | low | | reject |
+| 18 | blind | E2E chỉ đường chính | low | Nhánh phụ có unit test | reject |
+| 19 | blind | Spec/sprint lệch trạng thái | false | Sprint lên `review` ở bước trình bày | reject |
 
 ## Verification
 

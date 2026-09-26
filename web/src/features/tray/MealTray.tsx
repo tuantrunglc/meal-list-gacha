@@ -13,6 +13,8 @@ type Props = {
   itemsById: ReadonlyMap<string, Item>
   /** Người dùng muốn đổi bộ lọc (ví dụ mùa) sau khi thấy ô trống. */
   onChangeFilter: () => void
+  /** Câu đọc cho trình đọc màn hình khi mâm hiện (xem `trayAnnouncement`). */
+  announcement: string
 }
 
 type SlotView =
@@ -43,7 +45,7 @@ export function trayAnnouncement(slots: readonly TraySlot[], set: SetDefinition,
 
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
-export function MealTray({ set, itemsById, onChangeFilter }: Props) {
+export function MealTray({ set, itemsById, onChangeFilter, announcement: text }: Props) {
   const open = useTrayStore((s) => s.open)
   const slots = useTrayStore((s) => s.slots)
   const close = useTrayStore((s) => s.close)
@@ -58,7 +60,7 @@ export function MealTray({ set, itemsById, onChangeFilter }: Props) {
     skipRestore.current = false
     dialogRef.current?.focus()
     // Vùng live đã có trong DOM trước khi đổi nội dung thì trình đọc mới đọc
-    const t = window.setTimeout(() => setAnnouncement(trayAnnouncement(useTrayStore.getState().slots, set, itemsById)), 50)
+    const t = window.setTimeout(() => setAnnouncement(text), 50)
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') close()
     }
@@ -69,8 +71,7 @@ export function MealTray({ set, itemsById, onChangeFilter }: Props) {
       document.removeEventListener('keydown', onKey)
       if (!skipRestore.current) previous?.focus?.()
     }
-    // itemsById chỉ dùng cho câu đọc lúc mở mâm
-  }, [open, close, set])
+  }, [open, close, text])
 
   // Giữ focus trong dialog (aria-modal)
   function trapTab(e: KeyboardEvent) {

@@ -1,0 +1,82 @@
+/* Token lấy từ DESIGN.md (frontmatter). Component chỉ dùng biến, không viết cứng mã màu. */
+:root {
+  /* colors */
+  --color-surface-base: #fbf6ec;
+  --color-surface-raised: #ffffff;
+  --color-ink-primary: #3a2b22;
+  --color-ink-secondary: #86735f;
+  --color-ink-disabled: #c9bbae;
+  --color-primary: #d9433b;
+  --color-primary-pressed: #b8322b;
+  --color-on-primary: #ffffff;
+  --color-accent-tile: #2f8f83;
+  --color-accent-warm: #f2a541;
+  --color-accent-steel: #b9c0c7;
+  --color-accent-clay: #c8693f;
+  --color-border-soft: #efe3d0;
+  --color-rarity-common: #9cc5a1;
+  --color-rarity-rare: #4f97d6;
+  --color-rarity-legend: #f2b531;
+  --color-season-spring: #f7a6c1;
+  --color-season-summer: #ffb547;
+  --color-season-autumn: #d98a4e;
+  --color-season-winter: #7fb3d5;
+  --color-season-allyear: #b8a99a;
+  --color-group-man: #c8693f;
+  --color-group-rau: #6baa5c;
+  --color-group-canh: #e0a33a;
+  --color-tray: #e9d3ae;
+  --color-danger: #e5534b;
+
+  /* typography */
+  --font-display: 'Baloo 2', system-ui, sans-serif;
+  --font-body: 'Be Vietnam Pro', system-ui, sans-serif;
+
+  --text-display-family: var(--font-display);
+  --text-display-size: 2rem;
+  --text-display-weight: 800;
+  --text-display-line: 1.15;
+
+  --text-title-family: var(--font-display);
+  --text-title-size: 1.375rem;
+  --text-title-weight: 700;
+  --text-title-line: 1.25;
+
+  --text-body-family: var(--font-body);
+  --text-body-size: 1rem;
+  --text-body-weight: 400;
+  --text-body-line: 1.5;
+
+  --text-label-family: var(--font-body);
+  --text-label-size: 0.875rem;
+  --text-label-weight: 600;
+  --text-label-line: 1.3;
+
+  --text-meta-family: var(--font-body);
+  --text-meta-size: 0.75rem;
+  --text-meta-weight: 500;
+  --text-meta-line: 1.3;
+
+  /* rounded */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-full: 9999px;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-margin-mobile: 16px;
+
+  /* một mức bóng mềm, ấm duy nhất */
+  --shadow-soft: 0 6px 20px rgb(58 43 34 / 0.1);
+
+  /* kích thước khung */
+  --tab-bar-height: 4rem;
+  --content-max-width: 480px;
+}

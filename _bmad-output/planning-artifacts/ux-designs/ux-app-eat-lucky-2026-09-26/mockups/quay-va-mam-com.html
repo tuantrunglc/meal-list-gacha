@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nồi Thần — Mock màn Quay</title>
+<style>
+/*
+  Key screen: Màn Quay (lúc chờ) + Mâm cơm (1 mặn 1 rau 1 canh).
+  Tuân theo: DESIGN.md (Colors, Typography, Shapes, Components: gacha-pot, spin-button,
+  dish-card, rarity-badge, season-chip, tab-bar) và EXPERIENCE.md (Information Architecture,
+  Voice and Tone, Component Patterns, Luật Gacha, Motion, Luật Gacha, Key Flows › Flow 1 bước 1–7).
+  Font: dùng font hệ thống thay cho Baloo 2 / Be Vietnam Pro (mock chạy offline).
+*/
+:root{
+  --surface-base:#FBF6EC; --surface-raised:#FFFFFF;
+  --ink:#3A2B22; --ink-2:#86735F; --border:#EFE3D0;
+  --primary:#D9433B; --primary-pressed:#B8322B;
+  --tile:#2F8F83; --warm:#F2A541; --steel:#B9C0C7; --clay:#C8693F;
+  --r-common:#9CC5A1; --r-rare:#4F97D6; --r-legend:#F2B531;
+  --s-spring:#F7A6C1; --s-summer:#FFB547; --s-autumn:#D98A4E; --s-winter:#7FB3D5; --s-all:#B8A99A;
+  --display:800 32px/1.15 ui-rounded,"SF Pro Rounded",system-ui,sans-serif;
+  --title:700 22px/1.25 ui-rounded,"SF Pro Rounded",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+body{background:#E9E1D3;font:400 16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);
+  display:flex;flex-wrap:wrap;gap:40px;justify-content:center;padding:32px 16px}
+.col{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cap{font:600 14px/1.3 system-ui;color:var(--ink-2)}
+.phone{width:375px;height:780px;border-radius:44px;background:var(--surface-base);position:relative;overflow:hidden;
+  border:10px solid #2A211B;box-shadow:0 20px 50px rgba(58,43,34,.25)}
+/* họa tiết gạch bông mờ */
+.phone::before{content:"";position:absolute;inset:0;opacity:.07;pointer-events:none;
+  background-image:
+    radial-gradient(circle at 50% 50%, transparent 9px, var(--tile) 10px, var(--tile) 12px, transparent 13px),
+    conic-gradient(from 45deg, var(--tile) 0 25%, transparent 0 50%, var(--tile) 0 75%, transparent 0);
+  background-size:56px 56px, 28px 28px}
+.status{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 28px;font:600 14px system-ui}
+.top{display:flex;justify-content:space-between;align-items:center;padding:8px 16px}
+.deck{font:600 14px/1.3 system-ui;color:var(--ink-2);background:var(--surface-raised);border:1px solid var(--border);
+  padding:6px 12px;border-radius:9999px}
+.gear{width:40px;height:40px;border-radius:9999px;background:var(--surface-raised);border:1px solid var(--border);
+  display:grid;place-items:center;font-size:18px}
+.hello{font:var(--display);padding:12px 16px 4px}
+.sub{color:var(--ink-2);padding:0 16px;font-size:15px}
+.chips{display:flex;gap:8px;padding:16px;overflow-x:auto}
+.chip{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:9999px;
+  font:600 14px system-ui;background:var(--surface-raised);border:1px solid var(--border);white-space:nowrap}
+.chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.chip.on{background:var(--tile);color:#fff;border-color:var(--tile)}
+.stage{position:relative;height:300px;display:grid;place-items:center}
+.pot{width:220px;animation:breathe 3s ease-in-out infinite;transform-origin:50% 90%}
+.pot .lid{animation:lid 3s ease-in-out infinite;transform-origin:110px 70px}
+.steam path{stroke:var(--steel);stroke-width:5;fill:none;stroke-linecap:round;opacity:.8;animation:steam 2.4s ease-in-out infinite}
+.steam path:nth-child(2){animation-delay:.6s}.steam path:nth-child(3){animation-delay:1.2s}
+@keyframes breathe{50%{transform:scale(1.03)}}
+@keyframes lid{0%,80%,100%{transform:translateY(0) rotate(0)}88%{transform:translateY(-8px) rotate(-4deg)}94%{transform:translateY(-3px) rotate(3deg)}}
+@keyframes steam{0%{transform:translateY(8px);opacity:0}40%{opacity:.8}100%{transform:translateY(-18px);opacity:0}}
+.hint{text-align:center;color:var(--ink-2);font-size:14px;margin-top:-6px}
+.spin{display:block;margin:18px auto 0;width:calc(100% - 64px);height:64px;border:none;border-radius:9999px;
+  background:var(--primary);color:#fff;font:var(--title);box-shadow:0 6px 0 var(--primary-pressed),0 12px 24px rgba(217,67,59,.3)}
+.tabs{position:absolute;left:0;right:0;bottom:0;height:84px;background:var(--surface-raised);border-top:1px solid var(--border);
+  display:flex;justify-content:space-around;padding-top:10px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;font:600 12px system-ui;color:var(--ink-2)}
+.tab b{font-size:22px;font-weight:400}
+.tab.on{color:var(--primary)}
+/* Mâm cơm */
+.dim{position:absolute;inset:0;background:rgba(42,33,27,.55)}
+.result{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+.say{color:#fff;font:var(--title);text-align:center;margin-bottom:12px}
+.tray{width:100%;background:#E9D3AE;border-radius:24px;padding:12px;display:flex;flex-direction:column;gap:10px;
+  box-shadow:inset 0 0 0 6px #D9BC8C,0 12px 30px rgba(0,0,0,.3);
+  background-image:repeating-linear-gradient(45deg,rgba(160,120,70,.12) 0 6px,transparent 6px 12px)}
+.slot{height:96px;background:#fff;border-radius:16px;border:3px solid var(--r-common);display:flex;align-items:center;gap:10px;padding:8px;
+  position:relative;animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
+.slot:nth-child(1){animation-delay:.1s}.slot:nth-child(2){animation-delay:.6s}.slot:nth-child(3){animation-delay:1.2s}
+.slot.rare{border-color:var(--r-rare)}
+.slot.legend{border-color:var(--r-legend);box-shadow:0 0 0 4px rgba(242,181,49,.3),0 0 24px rgba(242,181,49,.6)}
+.slot.locked{background:#F4F1EA}
+@keyframes pop{from{transform:scale(.5) translateY(40px);opacity:0}}
+.thumb{width:72px;height:72px;border-radius:12px;flex:none}
+.info{flex:1;min-width:0}
+.gt{font:700 11px system-ui;color:#fff;padding:2px 8px;border-radius:9999px;display:inline-block}
+.nm{font:800 17px/1.2 ui-rounded,"SF Pro Rounded",system-ui;margin:3px 0 1px}
+.st{font:600 12px system-ui;color:var(--ink-2)}
+.ic{width:40px;height:40px;border-radius:9999px;border:1px solid var(--border);background:#fff;display:grid;place-items:center;font-size:17px;flex:none}
+.ic.on{background:var(--tile);border-color:var(--tile)}
+.sparkle{position:absolute;color:var(--r-legend);font-size:16px;animation:tw 1.6s ease-in-out infinite}
+@keyframes tw{50%{opacity:.2;transform:scale(.6)}}
+.acts{display:flex;gap:10px;margin-top:14px;width:100%}
+.btn{flex:1;height:52px;border-radius:9999px;font:700 16px system-ui;border:1px solid var(--border);background:var(--surface-raised);color:var(--ink)}
+.btn.main{background:var(--primary);color:#fff;border:none;box-shadow:0 4px 0 var(--primary-pressed)}
+.add{margin-top:10px;color:#fff;font:600 14px system-ui;opacity:.9}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- Màn 1: Quay lúc chờ -->
+<div class="col">
+  <div class="phone">
+    <div class="status"><span>17:02</span><span>●●● 🔋</span></div>
+    <div class="top"><span class="deck">Bộ: Món ăn ▾</span><span class="gear" aria-label="Cài đặt">⚙︎</span></div>
+    <h1 class="hello">Nay ăn gì cả nhà?</h1>
+    <p class="sub">Mấy món gần đây nồi giấu đi rồi, khỏi lo trùng 😉</p>
+    <div class="chips" role="radiogroup" aria-label="Mùa">
+      <span class="chip"><i style="background:var(--s-spring)"></i>Xuân</span>
+      <span class="chip"><i style="background:var(--s-summer)"></i>Hạ</span>
+      <span class="chip on"><i style="background:#fff"></i>Thu</span>
+      <span class="chip"><i style="background:var(--s-winter)"></i>Đông</span>
+      <span class="chip"><i style="background:var(--s-all)"></i>Quanh năm</span>
+    </div>
+    <div class="stage">
+      <svg class="pot" viewBox="0 0 220 220" aria-hidden="true">
+        <g class="steam"><path d="M80 40 q-8 -12 0 -24"/><path d="M110 34 q-8 -12 0 -24"/><path d="M140 40 q-8 -12 0 -24"/></g>
+        <ellipse cx="110" cy="200" rx="80" ry="10" fill="#3A2B22" opacity=".12"/>
+        <!-- thân nồi đất -->
+        <path d="M36 92 Q30 180 110 196 Q190 180 184 92 Z" fill="#C8693F"/>
+        <path d="M36 92 Q34 120 44 142 Q110 160 176 142 Q186 120 184 92 Z" fill="#B55A33"/>
+        <path d="M52 118 Q110 132 168 118" stroke="#E4A07A" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <!-- quai -->
+        <path d="M36 104 q-20 0 -20 14 q0 10 16 8" stroke="#A64F2B" stroke-width="8" fill="none" stroke-linecap="round"/>
+        <path d="M184 104 q20 0 20 14 q0 10 -16 8" stroke="#A64F2B" stroke-width="8" fill="none" stroke-linecap="round"/>
+        <!-- mặt -->
+        <circle cx="86" cy="150" r="6" fill="#3A2B22"/><circle cx="134" cy="150" r="6" fill="#3A2B22"/>
+        <circle cx="88" cy="148" r="2" fill="#fff"/><circle cx="136" cy="148" r="2" fill="#fff"/>
+        <path d="M100 164 q10 9 20 0" stroke="#3A2B22" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <ellipse cx="72" cy="166" rx="9" ry="5" fill="#F7A6C1" opacity=".7"/><ellipse cx="148" cy="166" rx="9" ry="5" fill="#F7A6C1" opacity=".7"/>
+        <!-- nắp -->
+        <g class="lid">
+          <ellipse cx="110" cy="90" rx="80" ry="16" fill="#A64F2B"/>
+          <path d="M40 88 Q110 40 180 88 Z" fill="#D07A4C"/>
+          <ellipse cx="110" cy="56" rx="14" ry="8" fill="#A64F2B"/>
+        </g>
+      </svg>
+    </div>
+    <p class="hint">Chạm nút để mở nồi</p>
+    <button class="spin">Mở nồi!</button>
+    <nav class="tabs">
+      <span class="tab on"><b>🍲</b>Quay</span>
+      <span class="tab"><b>📖</b>Món ăn</span>
+      <span class="tab"><b>🕘</b>Lịch sử</span>
+    </nav>
+  </div>
+  <p class="cap">① Màn Quay lúc chờ, mùa Thu tự chọn sẵn</p>
+</div>
+
+<!-- Màn 2: Mâm cơm (kết quả) -->
+<div class="col">
+  <div class="phone">
+    <div class="status"><span>17:03</span><span>●●● 🔋</span></div>
+    <div class="top"><span class="deck">Bộ: Món ăn ▾</span><span class="gear">⚙︎</span></div>
+    <h1 class="hello">Nay ăn gì cả nhà?</h1>
+    <div class="dim"></div>
+    <div class="result" role="dialog" aria-label="Mâm cơm: Mặn Cá kho tộ, Đặc biệt; Rau Rau muống xào tỏi, Thường; Canh Canh chua, Ngon">
+      <p class="say">Nồi Thần dọn mâm!</p>
+      <div class="tray">
+        <div class="slot locked">
+          <div class="thumb" style="background:radial-gradient(circle at 40% 40%,#8DBF6A 0 30%,#5E9A45 31% 60%,#F4EAD8 61%)"></div>
+          <div class="info"><span class="gt" style="background:#6BAA5C">Rau</span><div class="nm">Rau muống xào tỏi</div><div class="st">⭐ Thường</div></div>
+          <span class="ic on" aria-label="Đang giữ">🔒</span>
+        </div>
+        <div class="slot rare">
+          <div class="thumb" style="background:radial-gradient(circle at 50% 50%,#F29D52 0 25%,#E9B04E 26% 58%,#F4EAD8 59%)"></div>
+          <div class="info"><span class="gt" style="background:#E0A33A">Canh</span><div class="nm">Canh chua</div><div class="st">⭐⭐ Ngon</div></div>
+          <span class="ic" aria-label="Đổi món này">🎲</span><span class="ic" aria-label="Không giữ">🔓</span>
+        </div>
+        <div class="slot legend">
+          <span class="sparkle" style="top:4px;right:96px">✦</span><span class="sparkle" style="bottom:6px;left:84px;animation-delay:.6s">✧</span>
+          <div class="thumb" style="background:radial-gradient(ellipse 50% 40% at 50% 55%,#7A3B1E 0 60%,#C8693F 61% 90%,#F4EAD8 91%)"></div>
+          <div class="info"><span class="gt" style="background:#C8693F">Mặn</span><div class="nm">Cá kho tộ</div><div class="st">⭐⭐⭐ Đặc biệt</div></div>
+          <span class="ic" aria-label="Đổi món này">🎲</span><span class="ic" aria-label="Không giữ">🔓</span>
+        </div>
+      </div>
+      <div class="acts">
+        <button class="btn">Đổi cả mâm</button>
+        <button class="btn main">Chốt mâm!</button>
+      </div>
+      <span class="add">＋ Thêm món</span>
+    </div>
+  </div>
+  <p class="cap">② Mâm cơm: 3 thẻ bật lần lượt, món ⭐⭐⭐ ra cuối · Rau đang được giữ 🔒</p>
+</div>
+
+</body>
+</html>

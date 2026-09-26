@@ -1,0 +1,9 @@
+node_modules
+dist
+.DS_Store
+.env
+.env.*
+!.env.example
+# PocketBase chạy local khi dev
+server/pb_data
+.tools

@@ -126,3 +126,9 @@
   outline: 2px solid var(--color-accent-tile);
   outline-offset: 2px;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin-button {
+    transition: none;
+  }
+}

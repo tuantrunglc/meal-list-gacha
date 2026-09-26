@@ -831,6 +831,10 @@ describe('SpinScreen', () => {
         expect(document.querySelector('.gacha-pot--teasing')).toBeNull()
         expect(screen.getByRole('dialog')).toBeInTheDocument()
         expect(bursts()).toHaveLength(0)
+        // độ hiếm vẫn nhận ra: viền màu theo bậc + số sao kèm chữ
+        const legend = screen.getAllByRole('listitem').at(-1)!
+        expect(legend.style.borderColor).toBe('var(--color-rarity-legend)')
+        expect(legend).toHaveTextContent('⭐⭐⭐ Đặc biệt')
         const slot = useTrayStore.getState().slots[0]
         const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
         fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))

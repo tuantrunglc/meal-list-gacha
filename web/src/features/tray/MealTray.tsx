@@ -1,4 +1,4 @@
-import { motion } from 'motion/react'
+import { m } from 'motion/react'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useCommitTray, type DrawEntry } from '../../data/draws'
 import { useItemImages } from '../../data/files'
@@ -467,7 +467,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                   )
                   if (v.kind === 'empty') {
                     return (
-                      <motion.li {...popFor(slot)} key={slot.id} className="meal-slot meal-slot--empty">
+                      <m.li {...popFor(slot)} key={slot.id} className="meal-slot meal-slot--empty">
                         <div className="meal-slot__info">
                           {g && <GroupTag label={g.label} color={g.color} />}
                           <p className="meal-slot__empty">{set.messages.emptySlot(v.groupLabel)}</p>
@@ -489,12 +489,12 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                           </button>
                         )}
                         {removeButton}
-                      </motion.li>
+                      </m.li>
                     )
                   }
                   if (v.kind === 'missing') {
                     return (
-                      <motion.li {...popFor(slot)} key={slot.id} className="meal-slot meal-slot--empty">
+                      <m.li {...popFor(slot)} key={slot.id} className="meal-slot meal-slot--empty">
                         <div className="meal-slot__info">{g && <GroupTag label={g.label} color={g.color} />}</div>
                         {slot.locked && (
                           <button
@@ -508,11 +508,11 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                           </button>
                         )}
                         {removeButton}
-                      </motion.li>
+                      </m.li>
                     )
                   }
                   return (
-                    <motion.li
+                    <m.li
                       {...popFor(slot)}
                       key={slot.id}
                       ref={(el: HTMLLIElement | null) => {
@@ -569,7 +569,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                         </button>
                         {removeButton}
                       </div>
-                    </motion.li>
+                    </m.li>
                   )
                 })}
                 {/* Chỗ của các thẻ sắp bật: giữ chiều cao mâm, không đọc */}

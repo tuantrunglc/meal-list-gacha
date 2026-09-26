@@ -1,0 +1,101 @@
+# CI/CD Nồi Thần
+# - Mọi push/PR: lint, typecheck, unit test, build, e2e.
+# - Push lên main (qua hết kiểm tra): build image trên GitHub, chuyển sang VPS bằng SSH
+#   (docker save | docker load, không cần registry), rồi chạy lại container.
+#   VPS không phải build nên không tốn RAM.
+#
+# Secrets cần đặt (Settings → Secrets and variables → Actions):
+#   VPS_HOST     IP hoặc domain VPS
+#   VPS_USER     user SSH (vd root)
+#   VPS_SSH_KEY  private key riêng cho CI (public key nằm trong ~/.ssh/authorized_keys của VPS)
+# Trên VPS cần sẵn /opt/noi-than (git clone) và /opt/noi-than/deploy/.env.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      # e2e dùng Chrome có sẵn trên runner + PocketBase tải về .tools/
+      - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: web/test-results
+          retention-days: 7
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          TAG="${TAG::7}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          docker build -f deploy/Dockerfile --build-arg APP_VERSION="$TAG" -t "noi-than:$TAG" .
+
+      - name: Cài SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ci
+          chmod 600 ~/.ssh/id_ci
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Chuyển image sang VPS
+        run: |
+          docker save "noi-than:$TAG" | gzip \
+            | ssh -i ~/.ssh/id_ci "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" 'gunzip | docker load'
+
+      - name: Chạy bản mới
+        run: |
+          ssh -i ~/.ssh/id_ci "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" TAG="$TAG" SHA="$GITHUB_SHA" 'sh -s' <<'EOF'
+          set -eu
+          cd /opt/noi-than
+          git fetch -q origin main
+          git checkout -q --detach "$SHA"
+          cd deploy
+          sed -i "s/^APP_VERSION=.*/APP_VERSION=$TAG/" .env
+          # image đã có sẵn nên compose không build lại
+          docker compose up -d --no-build app
+          for i in $(seq 1 30); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)")
+            [ "$s" = healthy ] && { echo "noi-than:$TAG healthy"; break; }
+            [ "$i" = 30 ] && { echo "container không healthy: $s" >&2; docker compose logs --tail 50 app; exit 1; }
+            sleep 2
+          done
+          # giữ 3 image gần nhất để còn quay lại bản cũ
+          docker images noi-than --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' | sort -r | tail -n +4 | cut -f2 | xargs -r docker rmi || true
+          EOF

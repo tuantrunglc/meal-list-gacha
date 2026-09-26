@@ -33,7 +33,7 @@ BASE="https://github.com/pocketbase/pocketbase/releases/download/v${VERSION}"
 curl -fsSL -o "$TMP/$ZIP" "$BASE/$ZIP"
 curl -fsSL -o "$TMP/checksums.txt" "$BASE/checksums.txt"
 # Kiểm checksum trước khi chạy binary vừa tải
-(cd "$TMP" && grep " $ZIP\$" checksums.txt | shasum -a 256 -c -) >/dev/null || { echo "Sai checksum $ZIP" >&2; exit 1; }
+(cd "$TMP" && grep " $ZIP\$" checksums.txt > sum.txt && [ -s sum.txt ] && shasum -a 256 -c sum.txt) >/dev/null || { echo "Sai checksum $ZIP" >&2; exit 1; }
 unzip -oq "$TMP/$ZIP" pocketbase -d "$DEST"
 chmod +x "$DEST/pocketbase"
 "$DEST/pocketbase" --version

@@ -1,0 +1,13 @@
+.git
+.tools
+.claude
+_bmad
+_bmad-output
+**/node_modules
+web/dist
+web/e2e/.pb_data
+web/test-results
+web/playwright-report
+server/pb_data
+**/.env
+deploy/backups

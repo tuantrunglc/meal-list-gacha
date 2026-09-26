@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { OWNER, PB_PORT } from './env.ts'
+import { ADMIN, API, OWNER } from './env.ts'
 import { login } from './helpers.ts'
-
-const API = `http://127.0.0.1:${PB_PORT}/api`
 
 test('chưa đăng nhập: mọi route là màn đăng nhập, không có thanh tab', async ({ page }) => {
   await page.goto('/lich-su')
@@ -54,4 +52,17 @@ test('API: không tự đăng ký được, khách không thấy household', asy
   expect(signup.status()).toBe(403)
   const list = await (await request.get(`${API}/collections/households/records`)).json()
   expect(list.totalItems).toBe(0)
+})
+
+test('cấu hình vận hành: backup hằng ngày giữ 7 bản, tin X-Forwarded-For (IP bên phải)', async ({ request }) => {
+  const auth = await request.post(`${API}/collections/_superusers/auth-with-password`, {
+    data: { identity: ADMIN.email, password: ADMIN.password },
+  })
+  const token = ((await auth.json()) as { token: string }).token
+  const settings = await (await request.get(`${API}/settings`, { headers: { Authorization: token } })).json()
+  expect(settings.meta.appName).toBe('Nồi Thần')
+  expect(settings.backups.cron).toBe('0 20 * * *')
+  expect(settings.backups.cronMaxKeep).toBe(7)
+  expect(settings.trustedProxy.headers).toEqual(['X-Forwarded-For'])
+  expect(settings.trustedProxy.useLeftmostIP).toBe(false)
 })

@@ -1,0 +1,48 @@
+# Chạy trên VPS: cd deploy && docker compose up -d
+# Có sẵn reverse proxy trên VPS: bỏ profile caddy, proxy tới 127.0.0.1:8090.
+# Chưa có: docker compose --profile caddy up -d (Caddy tự lấy chứng chỉ HTTPS cho DOMAIN).
+name: noi-than
+
+services:
+  app:
+    image: noi-than:${APP_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      # Nhãn phiên bản trong container khớp với tag image đang chạy
+      APP_VERSION: ${APP_VERSION:-latest}
+    volumes:
+      - pb_data:/pb/pb_data
+    ports:
+      # Chỉ mở trong máy; HTTPS do reverse proxy lo
+      - "127.0.0.1:${APP_PORT:-8090}:8090"
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    profiles: [caddy]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  # Toàn bộ dữ liệu (SQLite, ảnh, bản backup) — không mất khi dựng lại container
+  pb_data:
+  caddy_data:
+  caddy_config:

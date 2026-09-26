@@ -1,9 +1,8 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { foodSeed } from '../src/sets/food/seed'
-import { ADMIN, PB_PORT } from './env.ts'
+import { ADMIN, API } from './env.ts'
 import { login } from './helpers.ts'
 
-const API = `http://127.0.0.1:${PB_PORT}/api`
 type ItemRow = { id: string; seedKey: string; setKey: string; groupKey: string; household: string }
 
 async function authToken(page: Page) {

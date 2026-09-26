@@ -1,8 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
-import { ADMIN, PB_PORT } from './env.ts'
+import { ADMIN, API } from './env.ts'
 import { login } from './helpers.ts'
 
-const API = `http://127.0.0.1:${PB_PORT}/api`
 const token = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('pocketbase_auth') ?? '{}').token as string)
 
 async function openTray(page: Page) {

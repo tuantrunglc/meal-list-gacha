@@ -7,3 +7,5 @@ dist
 # PocketBase chạy local khi dev
 server/pb_data
 .tools
+deploy/.env
+deploy/backups

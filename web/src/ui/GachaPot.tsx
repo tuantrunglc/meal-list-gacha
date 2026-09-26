@@ -1,8 +1,25 @@
 import './GachaPot.css'
 
-/** Nồi đất (220px). `boiling`: sôi sùng sục, nắp nảy; `opening`: nắp bật tung khi mở nồi. Chỉ để trang trí. */
-export function GachaPot({ boiling, opening = false }: { boiling: boolean; opening?: boolean }) {
-  const state = boiling ? ' gacha-pot--boiling' : opening ? ' gacha-pot--opening' : ''
+type Props = {
+  /** Đang quay: sôi sùng sục, nắp nảy. */
+  boiling: boolean
+  /** Nhá hàng món ⭐⭐⭐: rung mạnh, khe nắp sáng vàng, hơi nước cuộn. */
+  teasing?: boolean
+  /** Mở nồi: nắp bật tung. */
+  opening?: boolean
+  /** Nắp lóe màu khi bật (⭐⭐: xanh; sau nhá hàng ⭐⭐⭐: khe vàng tắt dần). */
+  flash?: 'rare' | 'legend' | null
+}
+
+/** Nồi đất (220px). Chỉ để trang trí. */
+export function GachaPot({ boiling, teasing = false, opening = false, flash = null }: Props) {
+  const state = boiling
+    ? ' gacha-pot--boiling'
+    : teasing
+      ? ' gacha-pot--teasing'
+      : opening
+        ? ` gacha-pot--opening${flash ? ` gacha-pot--flash-${flash}` : ''}`
+        : ''
   return (
     <svg className={`gacha-pot${state}`} viewBox="0 0 220 220" aria-hidden="true" focusable="false">
       <g className="gacha-pot__steam">
@@ -23,6 +40,8 @@ export function GachaPot({ boiling, opening = false }: { boiling: boolean; openi
       <path d="M100 164 q10 9 20 0" stroke="var(--color-ink-primary)" strokeWidth="4" fill="none" strokeLinecap="round" />
       <ellipse cx="72" cy="166" rx="9" ry="5" fill="var(--color-season-spring)" opacity=".7" />
       <ellipse cx="148" cy="166" rx="9" ry="5" fill="var(--color-season-spring)" opacity=".7" />
+      {/* khe nắp sáng vàng khi nhá hàng */}
+      <ellipse className="gacha-pot__glow" cx="110" cy="92" rx="76" ry="10" fill="var(--color-rarity-legend)" />
       <g className="gacha-pot__lid">
         <ellipse cx="110" cy="90" rx="80" ry="16" fill="#A64F2B" />
         <path d="M40 88 Q110 40 180 88 Z" fill="#D07A4C" />

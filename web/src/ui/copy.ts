@@ -53,6 +53,7 @@ export const copy = {
     openDetail: (group: string, name: string, rarity: string) => `Xem công thức: ${group} ${name}, ${rarity}`,
     detailTitle: (name: string) => `Chi tiết món ${name}`,
     skipReveal: 'Hiện cả mâm ngay',
+    legendary: 'Đặc biệt!',
     backToTray: '← Về mâm',
     commit: 'Chốt mâm!',
     committing: 'Đang chốt…',

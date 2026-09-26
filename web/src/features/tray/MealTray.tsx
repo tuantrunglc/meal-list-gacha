@@ -9,6 +9,8 @@ import { DishImage } from '../../ui/DishImage'
 import { ItemDetail } from '../item-detail/ItemDetail'
 import { GroupTag } from '../../ui/GroupTag'
 import { RarityBadge, rarityColor } from '../../ui/RarityBadge'
+import { BURST_MS, RarityBurst } from '../../ui/RarityBurst'
+import { useReducedMotion } from '../../ui/useReducedMotion'
 import { MAX_SLOTS, useTrayStore, type DrawFn, type TraySlot } from './store'
 import './MealTray.css'
 
@@ -71,12 +73,24 @@ export const REVEAL_STEP_MS = 500
 /** Thẻ cuối bật xong thì chờ chút rồi mới mở khoá mâm. */
 export const REVEAL_SETTLE_MS = 600
 
+/** Thẻ ⭐⭐⭐ bật chậm hơn một nhịp. */
+export const LEGEND_BEAT_MS = 300
+/** 🎲: ô lật. */
+export const FLIP_MS = 600
+
 /** Thẻ bật từ nồi lên rồi rơi vào chỗ trên mâm. */
 const POP = {
   initial: { opacity: 0, scale: 0.6, y: -48 },
   animate: { opacity: 1, scale: 1, y: 0 },
   transition: { type: 'spring', stiffness: 420, damping: 24, restDelta: 0.001 },
 } as const
+/** ⭐⭐⭐: bật chậm, mềm hơn. */
+const POP_LEGEND = {
+  ...POP,
+  transition: { type: 'spring', stiffness: 240, damping: 20, restDelta: 0.001 },
+} as const
+
+type Burst = { rarity: 1 | 2 | 3; n: number }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
@@ -193,21 +207,111 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
     return () => window.clearTimeout(t)
   }, [text, revealing])
 
-  // Bật thẻ lần lượt: ô thứ n hiện sau REVEAL_FIRST_MS + (n−1)×REVEAL_STEP_MS
+  const reducedMotion = useReducedMotion()
+  // Đọc trong hẹn giờ: luôn là giá trị mới nhất (người dùng có thể bật Giảm chuyển động giữa chừng)
+  const reducedRef = useRef(reducedMotion)
+  useEffect(() => {
+    reducedRef.current = reducedMotion
+  }, [reducedMotion])
+  // Hiệu ứng theo bậc đang chạy trên từng ô
+  const [bursts, setBursts] = useState<Record<string, Burst>>({})
+  const burstSeq = useRef(0)
+  const playBurst = (slotId: string, rarity: 1 | 2 | 3) => {
+    if (reducedRef.current) return
+    burstSeq.current += 1
+    const n = burstSeq.current
+    setBursts((b) => ({ ...b, [slotId]: { rarity, n } }))
+  }
+  const endBurst = (slotId: string, n: number) =>
+    setBursts((b) => {
+      if (b[slotId]?.n !== n) return b
+      const rest = { ...b }
+      delete rest[slotId]
+      return rest
+    })
+  // Hiệu ứng theo bậc lúc quay (cùng nguồn với nồi nhá hàng ở màn Quay)
+  const rarityOf = (slot: TraySlot): 1 | 2 | 3 | null => (slot.status !== 'empty' && slot.itemId ? slot.rarity : null)
+
+  // Bật thẻ lần lượt: ô đầu sau REVEAL_FIRST_MS, mỗi ô sau cách REVEAL_STEP_MS (⭐⭐⭐ chậm thêm một nhịp).
+  // Thẻ cuối là ⭐⭐⭐ thì giữ lớp bỏ qua tới hết hiệu ứng.
   const [shown, setShown] = useState(0)
-  const slotCount = slots.length
+  const playBurstRef = useRef(playBurst)
+  useEffect(() => {
+    playBurstRef.current = playBurst
+  })
   useEffect(() => {
     if (!revealing) return
+    // Kế hoạch chốt lúc bắt đầu bật: danh sách món có tải lại giữa chừng cũng không đổi nhịp
+    const plan = useTrayStore.getState().slots
+    const ids = plan.map((s) => s.id)
+    const rarities = plan.map((s) => (s.status !== 'empty' && s.itemId ? s.rarity : null))
+    const beat = (i: number) => (rarities[i] === 3 ? LEGEND_BEAT_MS : 0)
     let n = 0
     let t: number
+    // đồng hồ của chuỗi bật và lúc hiệu ứng dài nhất kết thúc
+    let clock = REVEAL_FIRST_MS + beat(0)
+    let burstEnd = 0
     const tick = () => {
       n += 1
       setShown(n)
-      t = n >= slotCount ? window.setTimeout(finishReveal, REVEAL_SETTLE_MS) : window.setTimeout(tick, REVEAL_STEP_MS)
+      const r = rarities[n - 1]
+      if (r && !reducedRef.current) {
+        playBurstRef.current(ids[n - 1], r)
+        // chỉ giữ mâm chờ hiệu ứng ⭐⭐⭐ (chạm để bỏ qua); bậc thấp để tự tắt sau khi mở khoá
+        if (r === 3) burstEnd = Math.max(burstEnd, clock + BURST_MS[3])
+      }
+      if (n >= ids.length) {
+        t = window.setTimeout(finishReveal, Math.max(REVEAL_SETTLE_MS, burstEnd - clock))
+      } else {
+        const wait = REVEAL_STEP_MS + beat(n)
+        clock += wait
+        t = window.setTimeout(tick, wait)
+      }
     }
-    t = window.setTimeout(tick, REVEAL_FIRST_MS)
+    t = window.setTimeout(tick, clock)
     return () => window.clearTimeout(t)
-  }, [revealing, slotCount, finishReveal])
+  }, [revealing, finishReveal])
+
+  // Bỏ qua: hiện cả mâm, dừng mọi hiệu ứng đang chạy
+  function skipReveal() {
+    setBursts({})
+    finishReveal()
+  }
+
+  // 🎲: ô lật rồi chạy hiệu ứng theo bậc món mới. Mỗi ô một lần lật: chạm liên tục thì huỷ lần trước.
+  const slotEls = useRef(new Map<string, HTMLElement>())
+  const flips = useRef(new Map<string, { timer: number; anim?: Animation }>())
+  useEffect(() => {
+    const all = flips.current
+    return () => all.forEach((f) => window.clearTimeout(f.timer))
+  }, [])
+  function flipThenBurst(slotId: string) {
+    const prev = flips.current.get(slotId)
+    if (prev) {
+      window.clearTimeout(prev.timer)
+      prev.anim?.cancel()
+      flips.current.delete(slotId)
+    }
+    if (reducedRef.current) return
+    const el = slotEls.current.get(slotId)
+    // Web Animations: jsdom/trình duyệt cũ không có thì bỏ qua êm
+    const anim = el?.animate?.(
+      [
+        { transform: 'perspective(600px) rotateY(0deg)' },
+        { transform: 'perspective(600px) rotateY(90deg)' },
+        { transform: 'perspective(600px) rotateY(0deg)' },
+      ],
+      { duration: FLIP_MS, easing: 'ease-in-out' },
+    )
+    const timer = window.setTimeout(() => {
+      flips.current.delete(slotId)
+      // món mới sau khi đổi (đọc lại store lúc lật xong)
+      const slot = useTrayStore.getState().slots.find((s) => s.id === slotId)
+      const r = slot ? rarityOf(slot) : null
+      if (r) playBurst(slotId, r)
+    }, FLIP_MS)
+    flips.current.set(slotId, { timer, anim })
+  }
 
   // Bật xong (hoặc bỏ qua): focus lại dialog (nút bỏ qua vừa biến mất)
   const wasRevealing = useRef(revealing)
@@ -266,7 +370,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
   }, [inDetail])
 
   const visibleSlots = revealing ? slots.slice(0, shown) : slots
-  const pop = revealing ? POP : {}
+  const popFor = (slot: TraySlot) => (revealing ? (rarityOf(slot) === 3 ? POP_LEGEND : POP) : {})
 
   return (
     <div className="tray-overlay">
@@ -283,14 +387,14 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
           // Đang bật thẻ: Enter/Space cũng hiện cả mâm ngay (bàn phím, trình đọc màn hình)
           if (revealing && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault()
-            finishReveal()
+            skipReveal()
             return
           }
           trapTab(e)
         }}
       >
         {revealing && (
-          <button type="button" className="visually-hidden" onClick={finishReveal}>
+          <button type="button" className="visually-hidden" onClick={skipReveal}>
             {copy.tray.skipReveal}
           </button>
         )}
@@ -330,7 +434,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                   )
                   if (v.kind === 'empty') {
                     return (
-                      <motion.li {...pop} key={slot.id} className="meal-slot meal-slot--empty">
+                      <motion.li {...popFor(slot)} key={slot.id} className="meal-slot meal-slot--empty">
                         <div className="meal-slot__info">
                           {g && <GroupTag label={g.label} color={g.color} />}
                           <p className="meal-slot__empty">{set.messages.emptySlot(v.groupLabel)}</p>
@@ -357,7 +461,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                   }
                   if (v.kind === 'missing') {
                     return (
-                      <motion.li {...pop} key={slot.id} className="meal-slot meal-slot--empty">
+                      <motion.li {...popFor(slot)} key={slot.id} className="meal-slot meal-slot--empty">
                         <div className="meal-slot__info">{g && <GroupTag label={g.label} color={g.color} />}</div>
                         {slot.locked && (
                           <button
@@ -376,11 +480,22 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                   }
                   return (
                     <motion.li
-                      {...pop}
+                      {...popFor(slot)}
                       key={slot.id}
+                      ref={(el: HTMLLIElement | null) => {
+                        if (el) slotEls.current.set(slot.id, el)
+                        else slotEls.current.delete(slot.id)
+                      }}
                       className={`meal-slot${slot.locked ? ' meal-slot--locked' : ''}`}
                       style={{ borderColor: rarityColor[v.rarity] }}
                     >
+                      {bursts[slot.id] && (
+                        <RarityBurst
+                          key={bursts[slot.id].n}
+                          rarity={bursts[slot.id].rarity}
+                          onDone={() => endBurst(slot.id, bursts[slot.id].n)}
+                        />
+                      )}
                       <button
                         type="button"
                         className="meal-slot__open"
@@ -404,6 +519,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                           onClick={() => {
                             rerollOne(slot.id, draw)
                             announce(slot.id)
+                            flipThenBurst(slot.id)
                           }}
                         >
                           <span aria-hidden="true">🎲</span>
@@ -501,7 +617,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
       {revealing && (
         // Chạm bất kỳ đâu (kể cả nền) khi đang bật thẻ: hiện cả mâm ngay.
         // Bàn phím/trình đọc dùng nút cùng nhãn bên trong dialog.
-        <div className="tray-reveal__skip" aria-hidden="true" data-testid="reveal-skip" onClick={finishReveal} />
+        <div className="tray-reveal__skip" aria-hidden="true" data-testid="reveal-skip" onClick={skipReveal} />
       )}
     </div>
   )

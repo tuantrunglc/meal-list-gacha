@@ -55,6 +55,9 @@
 }
 
 .meal-slot {
+  position: relative;
+  /* hiệu ứng độ hiếm nằm sau nội dung thẻ */
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 10px;

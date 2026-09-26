@@ -41,6 +41,71 @@
   animation-duration: 0.9s;
 }
 
+/* Nhá hàng ⭐⭐⭐: rung mạnh hơn, khe nắp sáng vàng, hơi nước cuộn */
+.gacha-pot__glow {
+  opacity: 0;
+}
+
+.gacha-pot--teasing {
+  animation: pot-boil-strong 0.12s linear infinite;
+}
+
+.gacha-pot--teasing .gacha-pot__glow {
+  animation: pot-glow 0.8s ease-in forwards;
+}
+
+.gacha-pot--teasing .gacha-pot__lid {
+  animation: pot-lid 0.3s ease-in-out infinite;
+}
+
+.gacha-pot--teasing .gacha-pot__steam path {
+  animation-duration: 0.6s;
+  stroke-width: 7;
+}
+
+@keyframes pot-boil-strong {
+  25% {
+    transform: translateX(-4px) rotate(-2deg);
+  }
+  75% {
+    transform: translateX(4px) rotate(2deg);
+  }
+}
+
+@keyframes pot-glow {
+  to {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px var(--color-rarity-legend));
+  }
+}
+
+/* ⭐⭐: nắp lóe xanh dương khi bật */
+.gacha-pot--opening.gacha-pot--flash-rare .gacha-pot__lid {
+  animation:
+    pot-lid-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    pot-flash-rare 0.6s ease-out;
+}
+
+@keyframes pot-flash-rare {
+  30% {
+    filter: drop-shadow(0 0 10px var(--color-rarity-rare)) brightness(1.3);
+  }
+}
+
+/* Sau nhá hàng ⭐⭐⭐: khe nắp tắt sáng dần khi nắp bật (không tắt phụt) */
+.gacha-pot--opening.gacha-pot--flash-legend .gacha-pot__glow {
+  animation: pot-glow-out 0.5s ease-out forwards;
+}
+
+@keyframes pot-glow-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* Mở nồi: nắp bật tung lên rồi rơi về chỗ */
 .gacha-pot--opening .gacha-pot__lid {
   animation: pot-lid-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2);
@@ -93,6 +158,8 @@
 @media (prefers-reduced-motion: reduce) {
   .gacha-pot,
   .gacha-pot--boiling,
+  .gacha-pot--teasing,
+  .gacha-pot__glow,
   .gacha-pot__lid,
   .gacha-pot__steam path {
     animation: none !important;

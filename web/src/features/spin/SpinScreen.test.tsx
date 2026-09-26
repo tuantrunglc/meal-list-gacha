@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../data/errors'
 import type { Item, ItemsResult } from '../../data/items'
 import { foodSet } from '../../sets/food/definition'
-import { REVEAL_FIRST_MS, REVEAL_SETTLE_MS, REVEAL_STEP_MS } from '../tray/MealTray'
+import { BURST_MS } from '../../ui/RarityBurst'
+import { FLIP_MS, LEGEND_BEAT_MS, REVEAL_FIRST_MS, REVEAL_SETTLE_MS, REVEAL_STEP_MS } from '../tray/MealTray'
 import { useTrayStore } from '../tray/store'
-import { LID_LEAD_MS, SpinScreen } from './SpinScreen'
+import { LID_LEAD_MS, SpinScreen, TEASE_MS } from './SpinScreen'
 
 const refetch = vi.fn(async () => {})
 let state: ItemsResult
@@ -71,14 +72,15 @@ function toItems(filter: (d: (typeof foodSet.seed)[number]) => boolean = () => t
 function spinToTray() {
   fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
   act(() => vi.advanceTimersByTime(1600))
+  // mâm có ⭐⭐⭐ thì nồi nhá hàng trước
+  if (document.querySelector('.gacha-pot--teasing')) act(() => vi.advanceTimersByTime(TEASE_MS))
   act(() => vi.advanceTimersByTime(LID_LEAD_MS))
 }
 
 function spinAndWait() {
   spinToTray()
-  // thẻ bật lần lượt rồi mâm mở khoá
-  const n = useTrayStore.getState().slots.length
-  act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS + (n - 1) * REVEAL_STEP_MS + REVEAL_SETTLE_MS))
+  // thẻ bật lần lượt (kể cả nhịp ⭐⭐⭐ và hiệu ứng thẻ cuối) rồi mâm mở khoá
+  act(() => vi.advanceTimersByTime(5000))
   // câu đọc được đặt sau khi mâm hiện
   act(() => vi.advanceTimersByTime(60))
 }
@@ -128,6 +130,8 @@ describe('SpinScreen', () => {
   it('quay: khoá khi đang sôi, chạm thêm không quay lại, xong thì mở mâm 3 ô và đọc đúng câu', () => {
     const showResult = vi.spyOn(useTrayStore.getState(), 'showResult')
     useTrayStore.setState({ showResult })
+    // không có ⭐⭐⭐ (không nhá hàng, không nhịp chậm): thời gian cố định
+    state = { ...state, data: toItems((d) => d.rarity !== 3) }
     render(<SpinScreen />, { wrapper: MemoryRouter })
     fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
     expect(screen.getByRole('button', { name: 'Nồi đang sôi…' })).toHaveAttribute('aria-disabled', 'true')
@@ -620,6 +624,214 @@ describe('SpinScreen', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Để sau' }))
       }
       expect(seen.has(man[0].seedKey)).toBe(true)
+    })
+  })
+
+  describe('hiệu ứng độ hiếm', () => {
+    const bursts = (rarity?: number) =>
+      document.querySelectorAll(rarity ? `[data-rarity-burst="${rarity}"]` : '[data-rarity-burst]')
+
+    it('mâm có ⭐⭐⭐: nồi nhá hàng một lần rồi mới bật nắp; nút Quay khoá suốt; thẻ ⭐⭐⭐ chậm một nhịp, hiệu ứng riêng, mâm mở khoá khi hết hiệu ứng', () => {
+      // Mặn chỉ còn món ⭐⭐⭐, Rau/Canh chỉ món ⭐
+      state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      act(() => vi.advanceTimersByTime(1600))
+      expect(document.querySelector('.gacha-pot--teasing')).not.toBeNull()
+      expect(screen.getByRole('button', { name: 'Nồi đang sôi…' })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.queryByRole('dialog')).toBeNull()
+      act(() => vi.advanceTimersByTime(TEASE_MS))
+      expect(document.querySelector('.gacha-pot--teasing')).toBeNull()
+      expect(document.querySelector('.gacha-pot--opening')).not.toBeNull()
+      // có ⭐⭐⭐ thì không lóe xanh
+      expect(document.querySelector('.gacha-pot--flash-rare')).toBeNull()
+      act(() => vi.advanceTimersByTime(LID_LEAD_MS))
+      const dialog = screen.getByRole('dialog', { name: 'Mâm cơm' })
+      // ⭐⭐⭐ ra cuối
+      expect(useTrayStore.getState().slots.map((sl) => sl.rarity)).toEqual([1, 1, 3])
+
+      act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+      expect(bursts(1)).toHaveLength(1)
+      act(() => vi.advanceTimersByTime(REVEAL_STEP_MS))
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(2)
+      // thẻ ⭐⭐⭐ chậm hơn một nhịp
+      act(() => vi.advanceTimersByTime(REVEAL_STEP_MS))
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(2)
+      act(() => vi.advanceTimersByTime(LEGEND_BEAT_MS))
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+      expect(bursts(3)).toHaveLength(1)
+      // chữ "Đặc biệt!" chỉ để nhìn, trình đọc không đọc lại
+      expect(screen.getByText('Đặc biệt!').closest('[aria-hidden="true"]')).not.toBeNull()
+      // mâm chưa mở khoá tới khi hết hiệu ứng ⭐⭐⭐
+      act(() => vi.advanceTimersByTime(REVEAL_SETTLE_MS))
+      expect(within(dialog).getByRole('button', { name: 'Chốt mâm!' })).toBeDisabled()
+      act(() => vi.advanceTimersByTime(BURST_MS[3] - REVEAL_SETTLE_MS))
+      expect(within(dialog).getByRole('button', { name: 'Chốt mâm!' })).toBeEnabled()
+      expect(bursts()).toHaveLength(0)
+    })
+
+    it('mâm có ⭐⭐ (không ⭐⭐⭐): không nhá hàng, nắp lóe xanh; mỗi thẻ vệt xanh', () => {
+      state = { ...state, data: toItems((d) => d.rarity === 2) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      act(() => vi.advanceTimersByTime(1600))
+      expect(document.querySelector('.gacha-pot--teasing')).toBeNull()
+      expect(document.querySelector('.gacha-pot--flash-rare')).not.toBeNull()
+      act(() => vi.advanceTimersByTime(LID_LEAD_MS))
+      act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+      expect(bursts(2)).toHaveLength(1)
+      act(() => vi.advanceTimersByTime(REVEAL_STEP_MS))
+      expect(bursts(2)).toHaveLength(2)
+      // hiệu ứng tự tắt
+      act(() => vi.advanceTimersByTime(3000))
+      act(() => vi.advanceTimersByTime(BURST_MS[2]))
+      expect(bursts()).toHaveLength(0)
+    })
+
+    it('bỏ qua khi đang có hiệu ứng: dừng hết hiệu ứng, hiện cả mâm', () => {
+      state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinToTray()
+      act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+      expect(bursts()).toHaveLength(1)
+      fireEvent.click(screen.getByTestId('reveal-skip'))
+      expect(bursts()).toHaveLength(0)
+      expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(3)
+    })
+
+    it('🎲: ô lật xong thì chạy hiệu ứng theo bậc món mới, focus giữ ở 🎲', () => {
+      state = { ...state, data: toItems((d) => d.rarity === 2) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinAndWait()
+      act(() => vi.advanceTimersByTime(BURST_MS[2]))
+      expect(bursts()).toHaveLength(0)
+      const slot = useTrayStore.getState().slots[0]
+      const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+      const dice = screen.getByRole('button', { name: `Đổi món này: ${d.name}` })
+      dice.focus()
+      fireEvent.click(dice)
+      expect(bursts()).toHaveLength(0)
+      act(() => vi.advanceTimersByTime(FLIP_MS))
+      expect(bursts(2)).toHaveLength(1)
+      expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^Đổi món này: /)
+    })
+
+    const legendMan = () => toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1))
+
+    it('chạm lại khi đang nhá hàng / nắp đang bật: không quay lại, mâm vẫn là mâm đã nhá', () => {
+      const showResult = vi.spyOn(useTrayStore.getState(), 'showResult')
+      useTrayStore.setState({ showResult })
+      state = { ...state, data: legendMan() }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      act(() => vi.advanceTimersByTime(1600))
+      fireEvent.click(screen.getByRole('button', { name: 'Nồi đang sôi…' }))
+      act(() => vi.advanceTimersByTime(TEASE_MS))
+      // nắp bật sau nhá hàng: khe vàng tắt dần
+      expect(document.querySelector('.gacha-pot--flash-legend')).not.toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Nồi đang sôi…' }))
+      act(() => vi.advanceTimersByTime(LID_LEAD_MS))
+      act(() => vi.advanceTimersByTime(5000))
+      expect(showResult).toHaveBeenCalledOnce()
+      expect(useTrayStore.getState().slots.map((sl) => sl.rarity)).toEqual([1, 1, 3])
+      // nhá hàng chỉ một lần
+      expect(document.querySelector('.gacha-pot--teasing')).toBeNull()
+    })
+
+    it('rời màn Quay khi đang nhá hàng: không mở mâm, không lỗi', () => {
+      state = { ...state, data: legendMan() }
+      const { unmount } = render(<SpinScreen />, { wrapper: MemoryRouter })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      act(() => vi.advanceTimersByTime(1600))
+      unmount()
+      act(() => vi.advanceTimersByTime(5000))
+      expect(useTrayStore.getState().open).toBe(false)
+    })
+
+    it('hai món ⭐⭐⭐: mỗi thẻ hiệu ứng riêng, mâm khoá tới khi hiệu ứng cuối xong', () => {
+      state = { ...state, data: toItems((d) => (d.groupKey === 'canh' ? d.rarity === 1 : d.rarity === 3)) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinToTray()
+      expect(useTrayStore.getState().slots.map((sl) => sl.rarity)).toEqual([1, 3, 3])
+      act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+      act(() => vi.advanceTimersByTime(REVEAL_STEP_MS + LEGEND_BEAT_MS))
+      act(() => vi.advanceTimersByTime(REVEAL_STEP_MS + LEGEND_BEAT_MS))
+      expect(bursts(3)).toHaveLength(2)
+      act(() => vi.advanceTimersByTime(BURST_MS[3] - 1))
+      expect(screen.getByRole('button', { name: 'Chốt mâm!' })).toBeDisabled()
+      act(() => vi.advanceTimersByTime(1))
+      expect(screen.getByRole('button', { name: 'Chốt mâm!' })).toBeEnabled()
+    })
+
+    it.each([
+      ['Enter trên mâm', () => fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter' })],
+      ['nút ẩn "Hiện cả mâm ngay"', () => fireEvent.click(screen.getByRole('button', { name: 'Hiện cả mâm ngay' }))],
+    ])('bỏ qua bằng %s khi đang có hiệu ứng: dừng hết', (_label, skip) => {
+      state = { ...state, data: legendMan() }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinToTray()
+      act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+      expect(bursts()).toHaveLength(1)
+      skip()
+      expect(bursts()).toHaveLength(0)
+      expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(3)
+    })
+
+    it('🎲 sang món khác bậc: hiệu ứng theo bậc món mới; chạm liên tục chỉ một hiệu ứng', () => {
+      // Mặn chỉ có 2 món: một ⭐, một ⭐⭐⭐ → đổi là ra món kia (khác bậc)
+      const man = [
+        foodSet.seed.find((d) => d.groupKey === 'man' && d.rarity === 1)!,
+        foodSet.seed.find((d) => d.groupKey === 'man' && d.rarity === 3)!,
+      ]
+      state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? man.includes(d) : d.rarity === 2)) }
+      render(<SpinScreen />, { wrapper: MemoryRouter })
+      spinAndWait()
+      act(() => vi.advanceTimersByTime(BURST_MS[3]))
+      expect(bursts()).toHaveLength(0)
+      const manSlot = () => useTrayStore.getState().slots.find((sl) => sl.groupKey === 'man')!
+      const before = manSlot().rarity
+      const name = foodSet.seed.find((x) => x.seedKey === manSlot().itemId)!.name
+      fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${name}` }))
+      const after = manSlot().rarity
+      expect(after).not.toBe(before)
+      act(() => vi.advanceTimersByTime(FLIP_MS))
+      expect(bursts(after!)).toHaveLength(1)
+      expect(bursts(before!)).toHaveLength(0)
+      act(() => vi.advanceTimersByTime(BURST_MS[3]))
+      // chạm 🎲 hai lần liên tiếp: lần lật trước bị huỷ, chỉ một hiệu ứng
+      const n1 = foodSet.seed.find((x) => x.seedKey === manSlot().itemId)!.name
+      fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${n1}` }))
+      act(() => vi.advanceTimersByTime(FLIP_MS / 2))
+      const n2 = foodSet.seed.find((x) => x.seedKey === manSlot().itemId)!.name
+      fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${n2}` }))
+      act(() => vi.advanceTimersByTime(FLIP_MS / 2))
+      expect(bursts()).toHaveLength(0)
+      act(() => vi.advanceTimersByTime(FLIP_MS / 2))
+      expect(bursts()).toHaveLength(1)
+    })
+
+    it('giảm chuyển động: không nhá hàng, không hiệu ứng, 🎲 không lật', () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({
+        matches: q.includes('prefers-reduced-motion'),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }))
+      try {
+        state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 2)) }
+        render(<SpinScreen />, { wrapper: MemoryRouter })
+        fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+        act(() => vi.advanceTimersByTime(310))
+        expect(document.querySelector('.gacha-pot--teasing')).toBeNull()
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+        expect(bursts()).toHaveLength(0)
+        const slot = useTrayStore.getState().slots[0]
+        const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+        fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))
+        act(() => vi.advanceTimersByTime(FLIP_MS))
+        expect(bursts()).toHaveLength(0)
+      } finally {
+        vi.unstubAllGlobals()
+      }
     })
   })
 })

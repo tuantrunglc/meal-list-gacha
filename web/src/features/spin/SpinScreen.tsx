@@ -21,6 +21,8 @@ const SPIN_MS_REDUCED = 300
 const POT_OPEN_MS = 600
 /** Mâm mở khi nắp lên tới đỉnh (~40% của POT_OPEN_MS). */
 export const LID_LEAD_MS = 250
+/** Nhá hàng ⭐⭐⭐ trước khi bật nắp. */
+export const TEASE_MS = 800
 
 function defaultFilters(set: SetDefinition, now: Date): Record<string, string> {
   return Object.fromEntries(set.facets.map((f) => [f.key, f.defaultValue(now)]))
@@ -46,7 +48,11 @@ export function SpinScreen() {
   const statusRef = useRef<HTMLParagraphElement>(null)
   const [filters, setFilters] = useState(() => defaultFilters(set, new Date()))
   const [spinning, setSpinning] = useState(false)
+  // Từ lúc chạm "Mở nồi!" tới khi mâm mở (sôi → nhá hàng → nắp bật): khoá nút Quay
+  const [busy, setBusy] = useState(false)
   const [potOpening, setPotOpening] = useState(false)
+  const [potTeasing, setPotTeasing] = useState(false)
+  const [potFlash, setPotFlash] = useState<'rare' | 'legend' | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const reducedMotion = useReducedMotion()
   const showResult = useTrayStore((s) => s.showResult)
@@ -83,28 +89,40 @@ export function SpinScreen() {
     })
 
   function spin() {
-    if (spinning || !items.data) return
+    if (busy || !items.data) return
     setCommittedNote(false)
     const snapshot = itemsById
     // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
     const result = draw(set.slotTemplate.map((s, i) => ({ id: `slot-${i}`, groupKey: s.groupKey, itemId: null, keep: false })))
     const removable = new Set(set.slotTemplate.flatMap((s, i) => (s.removable ? [`slot-${i}`] : [])))
     setSpinning(true)
+    setBusy(true)
     timer.current = window.setTimeout(
       () => {
         setSpinning(false)
         const open = () => {
+          setBusy(false)
           showResult(result, removable, !reducedMotion)
           // Dùng đúng danh sách món đã quay, không phụ thuộc lần tải lại sau đó
           setAnnouncement(trayAnnouncement(useTrayStore.getState().slots, set, snapshot))
         }
         // Giảm chuyển động: hiện cả mâm (fade), nắp không bật
         if (reducedMotion) return open()
-        // Nắp bật tung trước, mâm mở khi nắp lên tới đỉnh, rồi thẻ bật lần lượt
-        setPotOpening(true)
-        window.clearTimeout(lidTimer.current)
-        lidTimer.current = window.setTimeout(() => setPotOpening(false), POT_OPEN_MS)
-        timer.current = window.setTimeout(open, LID_LEAD_MS)
+        const rarities = result.slots.map((s) => s.rarity)
+        const legend = rarities.includes(3)
+        // Nắp bật tung trước (⭐⭐: lóe xanh), mâm mở khi nắp lên tới đỉnh, rồi thẻ bật lần lượt
+        const popLid = () => {
+          setPotTeasing(false)
+          setPotFlash(legend ? 'legend' : rarities.includes(2) ? 'rare' : null)
+          setPotOpening(true)
+          window.clearTimeout(lidTimer.current)
+          lidTimer.current = window.setTimeout(() => setPotOpening(false), POT_OPEN_MS)
+          timer.current = window.setTimeout(open, LID_LEAD_MS)
+        }
+        if (!legend) return popLid()
+        // Có ⭐⭐⭐: nhá hàng một lần cho cả mâm
+        setPotTeasing(true)
+        timer.current = window.setTimeout(popLid, TEASE_MS)
       },
       reducedMotion ? SPIN_MS_REDUCED : SPIN_MS,
     )
@@ -142,7 +160,7 @@ export function SpinScreen() {
       ))}
 
       <div className="spin-screen__stage">
-        <GachaPot boiling={spinning} opening={potOpening} />
+        <GachaPot boiling={spinning} teasing={potTeasing} opening={potOpening} flash={potFlash} />
       </div>
 
       {items.error || recentDraws.error || (config.error && !config.data) ? (
@@ -171,10 +189,10 @@ export function SpinScreen() {
         onClick={spin}
         // Chờ cả danh sách món lẫn mâm gần đây, để luật tránh trùng luôn có hiệu lực
         disabled={!items.data || !config.data || (cooldownDays > 0 && !recentDraws.data)}
-        aria-disabled={spinning || undefined}
-        data-spinning={spinning || undefined}
+        aria-disabled={busy || undefined}
+        data-spinning={busy || undefined}
       >
-        {spinning ? copy.spin.spinning : copy.spin.button}
+        {busy ? copy.spin.spinning : copy.spin.button}
       </button>
 
       <MealTray

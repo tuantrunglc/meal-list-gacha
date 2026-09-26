@@ -10,7 +10,7 @@ test('mở nồi ra mâm cơm 3 ô, đóng mâm', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: 'Mâm cơm' })
   await expect(dialog).toBeVisible({ timeout: 5_000 })
   await expect(dialog.getByRole('listitem')).toHaveCount(3)
-  await expect(page.locator('[aria-live="polite"]')).toContainText('Mâm cơm: ')
+  await expect(dialog.locator('[aria-live="polite"]')).toContainText('Mâm cơm: ')
   await dialog.getByRole('button', { name: 'Để sau' }).click()
   await expect(dialog).toHaveCount(0)
 })

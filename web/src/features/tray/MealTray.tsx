@@ -21,6 +21,8 @@ type Props = {
   announcement: string
   /** Chốt mâm thành công (mâm đã đóng và bỏ). */
   onCommitted: () => void
+  /** Ô hết món: thêm món mới cho nhóm này (mâm đóng trước). */
+  onAddItem?: (groupKey: string) => void
 }
 
 /** Snapshot các ô có món theo thứ tự trên mâm (AD-4). */
@@ -66,7 +68,7 @@ export function MealTray(props: Props) {
   return open ? <TrayDialog {...props} /> : null
 }
 
-function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, onCommitted }: Props) {
+function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, onCommitted, onAddItem }: Props) {
   const slots = useTrayStore((s) => s.slots)
   const close = useTrayStore((s) => s.close)
   const toggleLock = useTrayStore((s) => s.toggleLock)
@@ -74,6 +76,8 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
   const rerollAll = useTrayStore((s) => s.rerollAll)
   const addSlot = useTrayStore((s) => s.addSlot)
   const removeSlot = useTrayStore((s) => s.removeSlot)
+  // Đóng mâm để đi việc khác (đổi mùa, thêm món, chốt xong) thì không trả focus về nút cũ
+  const skipRestore = useRef(false)
   const takeCommitId = useTrayStore((s) => s.takeCommitId)
   const commitId = useTrayStore((s) => s.commitId)
   const failedCommitId = useTrayStore((s) => s.failedCommitId)
@@ -99,6 +103,13 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
     // Mâm đã đổi sau một lần lỗi: xoá bản ghi của lần đó (nếu nó đã tới server).
     const replaceId = failedCommitId && failedCommitId !== id ? failedCommitId : null
     commit.mutate({ id, entries, replaceId }, { onError: () => markCommitFailed(id) })
+  }
+
+  // Đóng mâm để làm việc khác (đổi mùa, thêm món): nơi nhận focus do màn gọi quyết định
+  function closeThen(next: () => void) {
+    skipRestore.current = true
+    close()
+    next()
   }
 
   function safeClose() {
@@ -144,8 +155,6 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
   }
   const dialogRef = useRef<HTMLDivElement>(null)
   const [announcement, setAnnouncement] = useState('')
-  // Đóng vì "Đổi mùa" thì nơi nhận focus do màn gọi quyết định
-  const skipRestore = useRef(false)
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
@@ -259,14 +268,19 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                         <button
                           type="button"
                           className="button-secondary"
-                          onClick={() => {
-                            skipRestore.current = true
-                            close()
-                            onChangeFilter()
-                          }}
+                          onClick={() => closeThen(onChangeFilter)}
                         >
                           {set.messages.changeFilter}
                         </button>
+                        {onAddItem && (
+                          <button
+                            type="button"
+                            className="button-secondary"
+                            onClick={() => closeThen(() => onAddItem(slot.groupKey))}
+                          >
+                            {copy.editor.addButton}
+                          </button>
+                        )}
                         {removeButton}
                       </li>
                     )

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Rarity } from '../engine'
 import { AppError, isConflict, toAppError } from './errors'
 import { useCurrentHousehold } from './household'
@@ -180,4 +180,42 @@ export function itemImageSources(item: Item, fileToken?: string, size: 'thumb' |
   }
   if (item.seedKey) sources.push(`/seed/${item.seedKey}.webp`)
   return sources
+}
+
+export type NewItemInput = {
+  /** ID sinh một lần khi mở form; thử lại dùng lại (AD-4). */
+  id: string
+  groupKey: string
+  name: string
+  rarity: Rarity
+  tags: string[]
+  attrs: unknown
+}
+
+/** Tạo món mới của Bộ. Trùng ID (lần gửi trước đã tới server) coi là thành công. */
+export function useCreateItem(setKey: string) {
+  const household = useCurrentHousehold()
+  const queryClient = useQueryClient()
+  const householdId = household.data?.id
+  const mutation = useMutation<void, AppError, NewItemInput>({
+    mutationFn: async (input) => {
+      if (!householdId) throw new AppError('no-household')
+      const fields = { groupKey: input.groupKey, name: input.name.trim(), rarity: input.rarity, tags: input.tags, attrs: input.attrs }
+      try {
+        await pb.collection('items').create({ ...fields, id: input.id, household: householdId, setKey, seedKey: '', deleted: false })
+      } catch (err) {
+        if (!isConflict(err, 'id')) throw toAppError(err)
+        // Lần gửi trước đã tới server (mất phản hồi) mà người dùng sửa thêm rồi thử lại:
+        // cập nhật bản ghi đó để giữ đúng nội dung mới nhất
+        try {
+          await pb.collection('items').update(input.id, fields)
+        } catch (updateErr) {
+          throw toAppError(updateErr)
+        }
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.items(householdId ?? '', setKey) }),
+  })
+  // Chưa biết household thì chưa lưu được (đang tải, không phải lỗi)
+  return Object.assign(mutation, { ready: !!householdId })
 }

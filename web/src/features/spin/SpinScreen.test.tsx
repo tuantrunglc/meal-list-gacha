@@ -34,6 +34,7 @@ vi.mock('../../data/draws', () => ({
 vi.mock('../../data/items', () => ({
   useItems: () => state,
   itemImageSources: () => [],
+  useCreateItem: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
 }))
 
 function toItems(filter: (d: (typeof foodSet.seed)[number]) => boolean = () => true): Item[] {
@@ -190,6 +191,22 @@ describe('SpinScreen', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Đổi mùa' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Thu' }))
+  })
+
+  it('ô hết món → Thêm món: đóng mâm, mở form điền sẵn nhóm + mùa đang chọn; đóng form thì focus nút Quay', async () => {
+    state = { ...state, data: toItems((d) => d.groupKey !== 'canh') }
+    render(<SpinScreen />)
+    spinAndWait()
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Mâm cơm' })).getByRole('button', { name: 'Thêm món' }))
+    const editor = screen.getByRole('dialog', { name: 'Thêm món' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(editor).getByRole('radio', { name: 'Canh' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(editor).getByRole('radio', { name: 'Thu' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(within(editor).getByRole('button', { name: 'Thôi' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    vi.useRealTimers()
+    await new Promise((r) => requestAnimationFrame(r))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Mở nồi!' }))
   })
 
   it('Esc và "Để sau" đóng mâm', () => {

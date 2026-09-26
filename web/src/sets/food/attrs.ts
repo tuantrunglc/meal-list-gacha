@@ -18,7 +18,10 @@ export function parseFoodAttrs(raw: unknown): AttrsResult<FoodAttrs> {
   if (!isStringArray(ingredients)) return { ok: false, error: 'ingredients phải là mảng chuỗi' }
   if (!isStringArray(steps)) return { ok: false, error: 'steps phải là mảng chuỗi' }
   if (note !== undefined && typeof note !== 'string') return { ok: false, error: 'note phải là chuỗi' }
-  const value: FoodAttrs = { ingredients, steps }
-  if (note !== undefined && note !== '') value.note = note
+  // Bỏ khoảng trắng thừa và dòng trống (form cho thêm dòng trống)
+  const clean = (xs: string[]) => xs.map((x) => x.trim()).filter(Boolean)
+  const value: FoodAttrs = { ingredients: clean(ingredients), steps: clean(steps) }
+  const trimmedNote = note?.trim()
+  if (trimmedNote) value.note = trimmedNote
   return { ok: true, value }
 }

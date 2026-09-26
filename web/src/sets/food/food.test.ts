@@ -71,6 +71,10 @@ describe('Bộ food', () => {
         value: { ingredients: ['a'], steps: ['b'], note: 'c' },
       })
       expect(parseFoodAttrs({ ingredients: [], steps: [], note: '' })).toEqual({ ok: true, value: { ingredients: [], steps: [] } })
+      expect(parseFoodAttrs({ ingredients: [' cá ', '', '  '], steps: ['kho'], note: '   ' })).toEqual({
+        ok: true,
+        value: { ingredients: ['cá'], steps: ['kho'] },
+      })
     })
 
     it('từ chối sai schema', () => {

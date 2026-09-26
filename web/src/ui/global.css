@@ -155,3 +155,22 @@ button {
   white-space: nowrap;
   border: 0;
 }
+
+/* Nút xác nhận xoá / bỏ: màu danger */
+.button-danger {
+  min-height: 48px;
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: #fff;
+  font-family: var(--text-label-family);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button-danger:focus-visible {
+  outline: 2px solid var(--color-accent-tile);
+  outline-offset: 2px;
+}

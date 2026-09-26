@@ -5,6 +5,8 @@ import './FoodAttrsEditor.css'
 
 type Props = { value: FoodAttrs; onChange: (value: FoodAttrs) => void; disabled?: boolean }
 
+const MAX_LINES = 60
+
 type ListProps = {
   heading: string
   items: string[]
@@ -40,12 +42,13 @@ function LineList({ heading, items, numbered, lineLabel, addLabel, removeLabel, 
               className="input"
               aria-label={lineLabel(i + 1)}
               value={text}
+              maxLength={300}
               onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
               onKeyDown={(e) => {
                 // Enter ở dòng cuối: thêm dòng mới cho nhanh
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                   e.preventDefault()
-                  if (i === items.length - 1) onChange([...items, ''])
+                  if (i === items.length - 1 && items.length < MAX_LINES) onChange([...items, ''])
                   focusLine(i + 1)
                 }
               }}
@@ -67,6 +70,8 @@ function LineList({ heading, items, numbered, lineLabel, addLabel, removeLabel, 
       <button
         type="button"
         className="button-secondary food-editor__add"
+        // Giới hạn số dòng để công thức không vượt dung lượng lưu trên server
+        disabled={disabled || items.length >= MAX_LINES}
         onClick={() => {
           onChange([...items, ''])
           focusLine(items.length)
@@ -108,6 +113,7 @@ export function FoodAttrsEditor({ value, onChange, disabled }: Props) {
           className="input food-editor__note"
           rows={3}
           placeholder={foodCopy.notePlaceholder}
+          maxLength={2000}
           value={value.note ?? ''}
           disabled={disabled}
           onChange={(e) => onChange({ ...value, note: e.target.value })}

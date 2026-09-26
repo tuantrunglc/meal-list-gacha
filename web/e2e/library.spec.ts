@@ -17,6 +17,7 @@ test('thư viện: lưới 2 cột, lọc, tìm không dấu, mở chi tiết', 
   await expect(grid).toContainText('Cá kho tộ')
   await page.getByLabel('Tìm món').fill('')
 
+  // e2e thêm món tự dọn (xoá mềm) nên thư viện đúng 51 món seed
   await expect(grid.getByRole('listitem')).toHaveCount(51)
 
   await page.getByRole('radio', { name: 'Canh' }).click()
@@ -24,7 +25,7 @@ test('thư viện: lưới 2 cột, lọc, tìm không dấu, mở chi tiết', 
   await expect(grid.locator('.group-tag')).toHaveText(Array(16).fill('Canh'))
 
   await page.getByLabel('Tìm món').fill('pizza')
-  await expect(page.getByRole('status')).toHaveText('Không thấy món này. Thêm mới luôn?')
+  await expect(page.getByRole('status')).toContainText('Không thấy món này. Thêm mới luôn?')
   await page.getByLabel('Tìm món').fill('')
 
   const first = grid.getByRole('button').first()

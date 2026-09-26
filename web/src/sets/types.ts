@@ -38,6 +38,13 @@ export type SeedItem<A> = {
 }
 
 // facets là bản mở rộng của EngineSet nên SetDefinition vẫn truyền thẳng cho engine được
+export type AttrsEditorProps<A> = {
+  value: A
+  // kiểu method: xem ghi chú ở AttrsEditor
+  onChange(value: A): void
+  disabled?: boolean
+}
+
 export type SetDefinition<A = unknown> = Omit<EngineSet, 'facets'> & {
   setKey: string
   label: string
@@ -59,7 +66,7 @@ export type SetDefinition<A = unknown> = Omit<EngineSet, 'facets'> & {
    * Khai báo kiểu method để registry chứa được mọi `SetDefinition<A>`; form luôn truyền
    * giá trị đã qua `parseAttrs`/`emptyAttrs` của chính Bộ đó.
    */
-  AttrsEditor(props: { value: A; onChange: (value: A) => void; disabled?: boolean }): ReactNode
+  AttrsEditor(props: AttrsEditorProps<A>): ReactNode
   /** Giá trị `attrs` cho món mới. */
   emptyAttrs: () => A
   /** Kiểm tra `items.attrs` theo schema riêng của Bộ. */

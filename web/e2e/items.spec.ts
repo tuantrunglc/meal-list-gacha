@@ -25,8 +25,10 @@ async function apiLogin(request: APIRequestContext, collection: string, identity
 async function seededItems(page: Page, request: APIRequestContext) {
   await login(page)
   const token = await authToken(page)
-  await expect.poll(async () => (await listItems(request, token)).totalItems, { timeout: 15_000 }).toBe(foodSeed.length)
-  return { token, items: (await listItems(request, token)).items }
+  // chỉ đếm món seed: các test khác có thể đã thêm món tự tạo
+  const seeded = async () => (await listItems(request, token)).items.filter((i) => i.seedKey !== '')
+  await expect.poll(async () => (await seeded()).length, { timeout: 15_000 }).toBe(foodSeed.length)
+  return { token, items: await seeded() }
 }
 
 test('vào app thì nồi có đủ đúng món mặc định, không báo lỗi, tải lại không nhân đôi', async ({ page, request }) => {
@@ -37,7 +39,7 @@ test('vào app thì nồi có đủ đúng món mặc định, không báo lỗi
   await page.reload()
   await page.getByRole('heading', { name: 'Nay ăn gì cả nhà?' }).waitFor()
   await page.waitForLoadState('networkidle')
-  expect((await listItems(request, token)).totalItems).toBe(foodSeed.length)
+  expect((await listItems(request, token)).items.filter((i) => i.seedKey !== '')).toHaveLength(foodSeed.length)
 })
 
 test('unique index chặn trùng seedKey trong một household', async ({ page, request }) => {

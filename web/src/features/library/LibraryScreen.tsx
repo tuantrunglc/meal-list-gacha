@@ -6,6 +6,7 @@ import { copy } from '../../ui/copy'
 import { DishCard } from '../../ui/DishCard'
 import { Modal } from '../../ui/Modal'
 import { ItemDetail } from '../item-detail/ItemDetail'
+import { ItemEditor, type EditorPrefill } from '../item-editor/ItemEditor'
 import { filterItems } from './filter'
 import './LibraryScreen.css'
 
@@ -21,6 +22,7 @@ export function LibraryScreen() {
     Object.fromEntries(set.facets.map((f) => [f.key, ALL])),
   )
   const [openId, setOpenId] = useState<string | null>(null)
+  const [editor, setEditor] = useState<EditorPrefill | null>(null)
   const detailHeading = useRef<HTMLHeadingElement>(null)
   const filtered = query.trim() === '' && (group !== ALL || Object.values(facets).some((v) => v !== ALL))
 
@@ -108,9 +110,12 @@ export function LibraryScreen() {
           </button>
         </div>
       ) : visible.length === 0 ? (
-        <p className="library__status" role="status">
-          {copy.library.notFound}
-        </p>
+        <div className="library__status" role="status">
+          <p>{copy.library.notFound}</p>
+          <button type="button" className="button-secondary" onClick={() => setEditor({ name: query.trim(), groupKey: group !== ALL ? group : undefined })}>
+            ＋ {copy.editor.addButton}
+          </button>
+        </div>
       ) : (
         <ul className="library__grid">
           {visible.map((item) => (
@@ -120,6 +125,12 @@ export function LibraryScreen() {
           ))}
         </ul>
       )}
+
+      <button type="button" className="library__add" aria-label={copy.editor.addButton} onClick={() => setEditor({})}>
+        <span aria-hidden="true">＋</span>
+      </button>
+
+      {editor && <ItemEditor set={set} prefill={editor} onClose={() => setEditor(null)} />}
 
       {openItem && (
         <Modal label={copy.tray.detailTitle(openItem.name)} onClose={() => setOpenId(null)} initialFocusRef={detailHeading}>

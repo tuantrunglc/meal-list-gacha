@@ -8,10 +8,16 @@ type Props = {
   options: readonly ChipOption[]
   value: string
   onChange: (key: string) => void
+  /** Trường bắt buộc chưa chọn: đánh dấu lỗi và trỏ tới dòng báo lỗi. */
+  invalid?: boolean
+  describedBy?: string
 }
 
 /** Nhóm chip chọn một (radiogroup): mũi tên trái/phải để đổi, chip chọn tô nền. */
-export const ChipGroup = forwardRef<HTMLDivElement, Props>(function ChipGroup({ label, options, value, onChange }, ref) {
+export const ChipGroup = forwardRef<HTMLDivElement, Props>(function ChipGroup(
+  { label, options, value, onChange, invalid, describedBy },
+  ref,
+) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
 
   function onKeyDown(e: KeyboardEvent, index: number) {
@@ -24,7 +30,15 @@ export const ChipGroup = forwardRef<HTMLDivElement, Props>(function ChipGroup({ 
   }
 
   return (
-    <div className="chip-group" role="radiogroup" aria-label={label} ref={ref} tabIndex={-1}>
+    <div
+      className="chip-group"
+      role="radiogroup"
+      aria-label={label}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
+      ref={ref}
+      tabIndex={-1}
+    >
       {options.map((o, i) => {
         const selected = o.key === value
         // Giá trị không khớp lựa chọn nào: chip đầu vẫn nhận Tab để bàn phím vào được nhóm

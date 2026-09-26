@@ -50,3 +50,32 @@
   font-weight: var(--text-label-weight);
   cursor: pointer;
 }
+
+/* Nút ＋ nổi, ngay trên thanh tab */
+.library__add {
+  position: fixed;
+  right: max(var(--space-margin-mobile), calc((100vw - var(--content-max-width)) / 2 + var(--space-margin-mobile)));
+  bottom: calc(var(--tab-bar-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  z-index: 11;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 1.75rem;
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+}
+
+.library__add:focus-visible {
+  outline: 3px solid var(--color-accent-tile);
+  outline-offset: 3px;
+}
+
+/* chừa chỗ để nút ＋ không che thẻ cuối */
+.library__grid {
+  padding-bottom: 72px;
+}

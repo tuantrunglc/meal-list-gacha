@@ -4,7 +4,7 @@ import { ClientResponseError } from 'pocketbase'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCurrentHousehold } from './household'
-import { itemImageSources, seedSet, useItems, type Item, type SeedSource } from './items'
+import { itemImageSources, seedSet, useCreateItem, useItems, type Item, type SeedSource } from './items'
 import { pb } from './pb'
 
 vi.mock('./auth', () => ({ useAuth: () => ({ isAuthenticated: true, userId: 'u1' }) }))
@@ -41,6 +41,7 @@ type Fake = {
   getFirstListItem: ReturnType<typeof vi.fn>
   getFullList: ReturnType<typeof vi.fn>
   create: ReturnType<typeof vi.fn>
+  update?: ReturnType<typeof vi.fn>
 }
 let fake: Fake
 
@@ -171,5 +172,33 @@ describe('itemImageSources', () => {
 
   it('món tự thêm chưa có ảnh thì không có nguồn', () => {
     expect(itemImageSources(base)).toEqual([])
+  })
+})
+
+describe('useCreateItem', () => {
+  const input = { id: 'abcdefghij12345', groupKey: 'g', name: '  Món mới ', rarity: 2 as const, tags: ['t'], attrs: { a: 1 } }
+  const fields = { groupKey: 'g', name: 'Món mới', rarity: 2, tags: ['t'], attrs: { a: 1 } }
+
+  async function ready() {
+    const hook = renderHook(() => useCreateItem('set-a'), { wrapper })
+    await waitFor(() => expect(hook.result.current.ready).toBe(true))
+    return hook
+  }
+
+  it('tạo món với household, setKey, seedKey rỗng, tên đã trim', async () => {
+    const { result } = await ready()
+    await result.current.mutateAsync(input)
+    expect(fake.create).toHaveBeenCalledOnce()
+    expect(fake.create.mock.calls[0][0]).toEqual({ ...fields, id: input.id, household: 'h1', setKey: 'set-a', seedKey: '', deleted: false })
+  })
+
+  it('trùng ID (lần trước đã tới server): cập nhật bản ghi bằng nội dung mới; lỗi mạng là AppError', async () => {
+    const { result } = await ready()
+    fake.update = vi.fn().mockResolvedValue({})
+    fake.create.mockRejectedValueOnce(new ClientResponseError({ status: 400, response: { data: { id: { code: 'validation_not_unique' } } } }))
+    await result.current.mutateAsync(input)
+    expect(fake.update).toHaveBeenCalledWith(input.id, fields)
+    fake.create.mockRejectedValueOnce(new ClientResponseError({ status: 0 }))
+    await expect(result.current.mutateAsync(input)).rejects.toMatchObject({ code: 'network' })
   })
 })

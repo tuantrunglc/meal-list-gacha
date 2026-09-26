@@ -8,6 +8,7 @@ import { ChipGroup } from '../../ui/ChipGroup'
 import { copy } from '../../ui/copy'
 import { GachaPot } from '../../ui/GachaPot'
 import { useReducedMotion } from '../../ui/useReducedMotion'
+import { ItemEditor, type EditorPrefill } from '../item-editor/ItemEditor'
 import { MealTray, trayAnnouncement } from '../tray/MealTray'
 import { useTrayStore, type DrawFn } from '../tray/store'
 import './SpinScreen.css'
@@ -32,6 +33,7 @@ export function SpinScreen() {
   const recentDraws = useRecentDraws(set.setKey, cooldownDays)
   const hasDraws = useHasDraws(set.setKey)
   const [committedNote, setCommittedNote] = useState(false)
+  const [editor, setEditor] = useState<EditorPrefill | null>(null)
   const statusRef = useRef<HTMLParagraphElement>(null)
   const [filters, setFilters] = useState(() => defaultFilters(set, new Date()))
   const [spinning, setSpinning] = useState(false)
@@ -157,12 +159,24 @@ export function SpinScreen() {
         draw={draw}
         onChangeFilter={focusFilters}
         announcement={announcement}
+        onAddItem={(groupKey) => setEditor({ groupKey, facets: filters })}
         onCommitted={() => {
           setCommittedNote(true)
           // Đưa focus vào phản hồi để trình đọc báo, và không rơi ra body
           window.setTimeout(() => statusRef.current?.focus(), 0)
         }}
       />
+      {editor && (
+        <ItemEditor
+          set={set}
+          prefill={editor}
+          onClose={() => {
+            setEditor(null)
+            // Nút mở form nằm trong mâm đã đóng: đưa focus về nút Quay
+            requestAnimationFrame(() => spinButton.current?.focus())
+          }}
+        />
+      )}
     </div>
   )
 }

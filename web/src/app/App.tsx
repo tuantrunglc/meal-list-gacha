@@ -3,6 +3,7 @@ import { HistoryScreen } from '../features/history/HistoryScreen'
 import { LibraryScreen } from '../features/library/LibraryScreen'
 import { SpinScreen } from '../features/spin/SpinScreen'
 import { AuthGate } from './AuthGate'
+import { Toaster } from '../ui/Toaster'
 import { TabBar } from './TabBar'
 
 function Shell() {
@@ -12,6 +13,7 @@ function Shell() {
         <Outlet />
       </main>
       <TabBar />
+      <Toaster />
     </AuthGate>
   )
 }

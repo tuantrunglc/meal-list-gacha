@@ -13,6 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // logic ngày lịch theo giờ máy: cố định múi giờ cho test ổn định
+    env: { TZ: 'Asia/Ho_Chi_Minh' },
     setupFiles: ['./src/test/setup.ts'],
     // e2e/ do Playwright chạy
     include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.ts'],

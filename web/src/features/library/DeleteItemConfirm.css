@@ -1,0 +1,29 @@
+.delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.delete-confirm__title {
+  margin: 0;
+  font-family: var(--text-title-family);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+}
+
+.delete-confirm__title:focus {
+  outline: none;
+}
+
+.delete-confirm__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.delete-confirm__actions > * {
+  flex: 1;
+}

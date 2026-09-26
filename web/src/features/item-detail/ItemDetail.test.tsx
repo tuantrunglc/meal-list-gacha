@@ -47,4 +47,13 @@ describe('ItemDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sửa' }))
     expect(onEdit).toHaveBeenCalledOnce()
   })
+
+  it('nút Xoá chỉ có khi truyền onDelete, bấm thì gọi', () => {
+    const { rerender } = render(<ItemDetail item={item} set={foodSet} />)
+    expect(screen.queryByRole('button', { name: 'Xoá' })).toBeNull()
+    const onDelete = vi.fn()
+    rerender(<ItemDetail item={item} set={foodSet} onDelete={onDelete} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Xoá' }))
+    expect(onDelete).toHaveBeenCalledOnce()
+  })
 })

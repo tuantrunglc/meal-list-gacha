@@ -9,12 +9,15 @@ type Props = {
   locked?: boolean
   /** Phần tử nhận focus khi mở (ví dụ tiêu đề); mặc định là dialog. */
   initialFocusRef?: RefObject<HTMLElement | null>
+  /** 'alertdialog' cho hộp xác nhận (xoá, bỏ thay đổi). */
+  role?: 'dialog' | 'alertdialog'
+  describedBy?: string
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** Lớp modal duy nhất: focus vào dialog, giữ Tab bên trong, Esc/chạm nền đóng, trả focus về chỗ cũ. */
-export function Modal({ label, onClose, children, locked = false, initialFocusRef }: Props) {
+export function Modal({ label, onClose, children, locked = false, initialFocusRef, role = 'dialog', describedBy }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   const lockedRef = useRef(locked)
@@ -56,7 +59,16 @@ export function Modal({ label, onClose, children, locked = false, initialFocusRe
   return (
     <div className="modal">
       <div className="modal__dim" aria-hidden="true" onClick={() => !locked && onClose()} />
-      <div className="modal__dialog" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={ref} onKeyDown={trapTab}>
+      <div
+        className="modal__dialog"
+        role={role}
+        aria-modal="true"
+        aria-label={label}
+        aria-describedby={describedBy}
+        tabIndex={-1}
+        ref={ref}
+        onKeyDown={trapTab}
+      >
         {children}
       </div>
     </div>

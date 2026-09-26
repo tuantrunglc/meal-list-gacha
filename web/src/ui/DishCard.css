@@ -1,4 +1,29 @@
+.dish-card__wrap {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.dish-card__swipe-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: rgb(229 83 75 / 0.35);
+  color: #fff;
+  font-weight: 700;
+}
+
+.dish-card__swipe-hint--armed {
+  background: var(--color-danger);
+}
+
 .dish-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -13,6 +38,14 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  /* vẫn cuộn dọc được, vuốt ngang để xoá */
+  touch-action: pan-y;
+  transition: transform 0.2s ease-out;
+}
+
+.dish-card[data-swiping] {
+  transition: none;
+  opacity: 0.85;
 }
 
 .dish-card:focus-visible {
@@ -50,4 +83,10 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dish-card {
+    transition: none;
+  }
 }

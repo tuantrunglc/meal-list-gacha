@@ -8,6 +8,7 @@ import { DishCard } from '../../ui/DishCard'
 import { Modal } from '../../ui/Modal'
 import { ItemDetail } from '../item-detail/ItemDetail'
 import { ItemEditor, type EditorPrefill } from '../item-editor/ItemEditor'
+import { DeleteItemConfirm } from './DeleteItemConfirm'
 import { filterItems } from './filter'
 import './LibraryScreen.css'
 
@@ -27,6 +28,8 @@ export function LibraryScreen() {
   const [editor, setEditor] = useState<EditorPrefill | null>(null)
   // Sửa món: đóng chi tiết, mở form; xong mở lại chi tiết món đó
   const [editingItem, setEditingItem] = useState<Item | null>(null)
+  // Xoá: nhớ có mở từ chi tiết không để "Thôi" thì quay lại chi tiết
+  const [deleting, setDeleting] = useState<{ item: Item; fromDetail: boolean } | null>(null)
   const detailHeading = useRef<HTMLHeadingElement>(null)
   const filtered = query.trim() === '' && (group !== ALL || Object.values(facets).some((v) => v !== ALL))
 
@@ -62,6 +65,7 @@ export function LibraryScreen() {
       dots: dots.map((d) => ({ label: d.label, color: d.color })),
       label: copy.library.card(item.name, g?.label ?? '', copy.rarity[item.rarity].label, dots.map((d) => d.label).join(', ')),
       onOpen: () => setOpenId(item.id),
+      onSwipeDelete: () => setDeleting({ item, fromDetail: false }),
     }
   }
 
@@ -159,8 +163,23 @@ export function LibraryScreen() {
               setOpenId(null)
               setEditingItem(openItem)
             }}
+            onDelete={() => {
+              setOpenId(null)
+              setDeleting({ item: openItem, fromDetail: true })
+            }}
           />
         </Modal>
+      )}
+      {deleting && (
+        <DeleteItemConfirm
+          item={deleting.item}
+          setKey={set.setKey}
+          onCancel={() => {
+            setDeleting(null)
+            if (deleting.fromDetail) setOpenId(deleting.item.id)
+          }}
+          onDeleted={() => setDeleting(null)}
+        />
       )}
     </div>
   )

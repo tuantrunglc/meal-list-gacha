@@ -4,7 +4,7 @@ import { ClientResponseError } from 'pocketbase'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCurrentHousehold } from './household'
-import { itemImageSources, seedSet, useCreateItem, useItems, useUpdateItem, type Item, type SeedSource } from './items'
+import { itemImageSources, seedSet, useCreateItem, useDeleteItem, useItems, useUpdateItem, type Item, type SeedSource } from './items'
 import { pb } from './pb'
 
 vi.mock('./auth', () => ({ useAuth: () => ({ isAuthenticated: true, userId: 'u1' }) }))
@@ -240,5 +240,20 @@ describe('useUpdateItem', () => {
     fake.update = vi.fn().mockRejectedValue(new ClientResponseError({ status: 0 }))
     const { result } = renderHook(() => useUpdateItem('set-a'), { wrapper })
     await expect(result.current.mutateAsync(base)).rejects.toMatchObject({ code: 'network' })
+  })
+})
+
+describe('useDeleteItem', () => {
+  it('xoá mềm: chỉ đặt deleted=true', async () => {
+    fake.update = vi.fn().mockResolvedValue({})
+    const { result } = renderHook(() => useDeleteItem('set-a'), { wrapper })
+    await result.current.mutateAsync('i1')
+    expect(fake.update).toHaveBeenCalledWith('i1', { deleted: true })
+  })
+
+  it('lỗi mạng là AppError', async () => {
+    fake.update = vi.fn().mockRejectedValue(new ClientResponseError({ status: 0 }))
+    const { result } = renderHook(() => useDeleteItem('set-a'), { wrapper })
+    await expect(result.current.mutateAsync('i1')).rejects.toMatchObject({ code: 'network' })
   })
 })

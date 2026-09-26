@@ -267,3 +267,21 @@ export function useUpdateItem(setKey: string) {
   })
   return Object.assign(mutation, { ready: !!householdId })
 }
+
+/** Xoá mềm món (AD-4): đặt `deleted=true`, không bao giờ xoá hẳn. */
+export function useDeleteItem(setKey: string) {
+  const household = useCurrentHousehold()
+  const queryClient = useQueryClient()
+  const householdId = household.data?.id
+  const mutation = useMutation<void, AppError, string>({
+    mutationFn: async (id) => {
+      try {
+        await pb.collection('items').update(id, { deleted: true })
+      } catch (err) {
+        throw toAppError(err)
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.items(householdId ?? '', setKey) }),
+  })
+  return Object.assign(mutation, { ready: !!householdId })
+}

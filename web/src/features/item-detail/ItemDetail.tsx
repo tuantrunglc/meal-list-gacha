@@ -13,10 +13,12 @@ type Props = {
   set: SetDefinition
   /** Có thì hiện nút Sửa. */
   onEdit?: () => void
+  /** Có thì hiện nút Xoá. */
+  onDelete?: () => void
 }
 
 /** Chi tiết món: phần chung (ảnh, tên, nhóm, độ hiếm, facet) + phần riêng của Bộ. Tên món nhận focus. */
-export const ItemDetail = forwardRef<HTMLHeadingElement, Props>(function ItemDetail({ item, set, onEdit }, headingRef) {
+export const ItemDetail = forwardRef<HTMLHeadingElement, Props>(function ItemDetail({ item, set, onEdit, onDelete }, headingRef) {
   const group = set.groups.find((g) => g.key === item.groupKey)
   const imagesOf = useItemImages()
   const DetailView = set.DetailView
@@ -41,10 +43,19 @@ export const ItemDetail = forwardRef<HTMLHeadingElement, Props>(function ItemDet
         ))}
       </div>
       <DetailView attrs={item.attrs} />
-      {onEdit && (
-        <button type="button" className="button-secondary item-detail__edit" onClick={onEdit}>
-          {copy.editor.editButton}
-        </button>
+      {(onEdit || onDelete) && (
+        <div className="item-detail__actions">
+          {onEdit && (
+            <button type="button" className="button-secondary item-detail__edit" onClick={onEdit}>
+              {copy.editor.editButton}
+            </button>
+          )}
+          {onDelete && (
+            <button type="button" className="button-secondary item-detail__delete" onClick={onDelete}>
+              {copy.editor.deleteButton}
+            </button>
+          )}
+        </div>
       )}
     </article>
   )

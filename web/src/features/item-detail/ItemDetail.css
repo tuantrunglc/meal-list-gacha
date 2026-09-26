@@ -48,8 +48,19 @@
   border-radius: 50%;
 }
 
-.item-detail__edit {
+.item-detail__actions {
+  display: flex;
   align-self: flex-start;
-  min-height: 44px;
+  gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+.item-detail__edit,
+.item-detail__delete {
+  min-height: 44px;
+}
+
+.item-detail__delete {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }

@@ -10,6 +10,7 @@ vi.mock('../../data/items', () => ({
   itemImageSources: () => [],
   useCreateItem: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
   useUpdateItem: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
+  useDeleteItem: () => ({ mutate: vi.fn(), isPending: false, error: null, ready: true }),
 }))
 
 const items: Item[] = foodSet.seed.map((d) => ({
@@ -111,5 +112,26 @@ describe('LibraryScreen', () => {
     expect(within(editor).getByLabelText('Tên món')).toHaveValue('Canh chua cá')
     fireEvent.click(within(editor).getByRole('button', { name: 'Thôi' }))
     expect(screen.getByRole('dialog', { name: 'Chi tiết món Canh chua cá' })).toBeInTheDocument()
+  })
+
+  it('Xoá trong chi tiết: mở xác nhận (một modal); Thôi thì quay lại chi tiết', () => {
+    render(<LibraryScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /^Canh chua cá, Canh, Ngon/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Xoá' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getAllByRole('alertdialog')).toHaveLength(1)
+    expect(screen.getByRole('alertdialog', { name: 'Xoá món Canh chua cá?' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Thôi' }))
+    expect(screen.getByRole('dialog', { name: 'Chi tiết món Canh chua cá' })).toBeInTheDocument()
+  })
+
+  it('vuốt thẻ sang trái thì mở xác nhận xoá', () => {
+    render(<LibraryScreen />)
+    const card = screen.getByRole('button', { name: /^Canh chua cá, Canh, Ngon/ })
+    fireEvent.pointerDown(card, { pointerId: 1, isPrimary: true, clientX: 200, clientY: 10 })
+    fireEvent.pointerMove(card, { pointerId: 1, clientX: 150, clientY: 11 })
+    fireEvent.pointerMove(card, { pointerId: 1, clientX: 90, clientY: 11 })
+    fireEvent.pointerUp(card, { pointerId: 1 })
+    expect(screen.getByRole('alertdialog', { name: 'Xoá món Canh chua cá?' })).toBeInTheDocument()
   })
 })

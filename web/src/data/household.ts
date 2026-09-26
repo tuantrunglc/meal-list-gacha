@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { ClientResponseError } from 'pocketbase'
 import { useAuth } from './auth'
-import { toAppError, type AppError } from './errors'
+import { AppError, toAppError } from './errors'
 import { queryKeys } from './keys'
 import { pb } from './pb'
 
@@ -21,6 +22,8 @@ export function useCurrentHousehold() {
         const record = await pb.collection('households').getFirstListItem('', { sort: 'created' })
         return { id: record.id, name: record.name as string }
       } catch (err) {
+        // getFirstListItem trả 404 khi không có household nào mình là thành viên
+        if (err instanceof ClientResponseError && err.status === 404) throw new AppError('no-household', err)
         throw toAppError(err)
       }
     },

@@ -1,45 +1,180 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "oxc"],
+  "plugins": [
+    "typescript",
+    "react",
+    "oxc"
+  ],
   "rules": {
     "no-restricted-imports": [
       "error",
       {
         "paths": [
-          { "name": "pocketbase", "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)." }
+          {
+            "name": "pocketbase",
+            "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)."
+          }
         ],
         "patterns": [
-          { "group": ["pocketbase/**"], "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)." }
+          {
+            "group": [
+              "pocketbase/**"
+            ],
+            "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)."
+          }
         ]
       }
     ]
   },
   "overrides": [
     {
-      "files": ["src/data/**"],
-      "rules": { "no-restricted-imports": "off" }
+      "files": [
+        "src/data/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/app",
+                  "**/app/**",
+                  "**/features",
+                  "**/features/**",
+                  "**/sets",
+                  "**/sets/**",
+                  "**/ui",
+                  "**/ui/**",
+                  "@/**",
+                  "src/**"
+                ],
+                "message": "data/ chỉ được import engine/ và pocketbase (AD graph)."
+              }
+            ]
+          }
+        ]
+      }
     },
     {
-      "files": ["src/engine/**"],
+      "files": [
+        "src/engine/**"
+      ],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "paths": [
-              { "name": "pocketbase", "message": "Engine là hàm thuần, không đụng pocketbase (AD-2)." }
+              {
+                "name": "pocketbase",
+                "message": "Engine là hàm thuần, không đụng pocketbase (AD-2)."
+              }
             ],
             "patterns": [
-              { "group": ["pocketbase/**"], "message": "Engine là hàm thuần, không đụng pocketbase (AD-2)." },
               {
                 "group": [
-                  "**/app", "**/app/**",
-                  "**/features", "**/features/**",
-                  "**/sets", "**/sets/**",
-                  "**/data", "**/data/**",
-                  "**/ui", "**/ui/**",
-                  "@/**", "src/**"
+                  "pocketbase/**"
+                ],
+                "message": "Engine là hàm thuần, không đụng pocketbase (AD-2)."
+              },
+              {
+                "group": [
+                  "**/app",
+                  "**/app/**",
+                  "**/features",
+                  "**/features/**",
+                  "**/sets",
+                  "**/sets/**",
+                  "**/data",
+                  "**/data/**",
+                  "**/ui",
+                  "**/ui/**",
+                  "@/**",
+                  "src/**"
                 ],
                 "message": "Engine không import lớp nào khác trong dự án (AD-2)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/sets/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "pocketbase",
+                "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)."
+              }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "pocketbase/**"
+                ],
+                "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)."
+              },
+              {
+                "group": [
+                  "**/app",
+                  "**/app/**",
+                  "**/features",
+                  "**/features/**",
+                  "**/data",
+                  "**/data/**",
+                  "@/**",
+                  "src/**"
+                ],
+                "message": "sets/ chỉ được import engine/ và ui/ (AD graph)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/ui/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "pocketbase",
+                "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)."
+              }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "pocketbase/**"
+                ],
+                "message": "Chỉ lớp src/data/ được import pocketbase (AD-5)."
+              },
+              {
+                "group": [
+                  "**/app",
+                  "**/app/**",
+                  "**/features",
+                  "**/features/**",
+                  "**/sets",
+                  "**/sets/**",
+                  "**/data",
+                  "**/data/**",
+                  "**/engine",
+                  "**/engine/**",
+                  "@/**",
+                  "src/**"
+                ],
+                "message": "ui/ không import lớp nào khác (AD graph)."
               }
             ]
           }

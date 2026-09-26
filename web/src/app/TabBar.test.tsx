@@ -4,6 +4,10 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 
+vi.mock('../data/items', () => ({
+  useItems: () => ({ isError: false, data: [] }),
+}))
+
 vi.mock('../data/auth', () => ({
   useAuth: () => ({ isAuthenticated: true, userId: 'u1' }),
   refreshSession: vi.fn(async () => {}),

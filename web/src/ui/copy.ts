@@ -20,6 +20,10 @@ export const copy = {
     submit: 'Vào bếp thôi!',
     submitting: 'Đang mở cửa bếp…',
   },
+  dishImage: {
+    empty: 'Thêm ảnh',
+  },
+  retry: 'Thử lại',
   screens: {
     spin: 'Mở nồi',
     library: 'Sổ món của nhà',

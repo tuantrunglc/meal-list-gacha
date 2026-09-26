@@ -7,14 +7,16 @@ function onError(err: unknown) {
   if (err instanceof AppError && err.code === 'unauthorized' && pb.authStore.token) pb.authStore.clear()
 }
 
+const NO_RETRY: readonly AppError['code'][] = ['unauthorized', 'no-household']
+
 // Online-only (AD-6): cache chỉ trong bộ nhớ, không persist.
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError }),
   mutationCache: new MutationCache({ onError }),
   defaultOptions: {
     queries: {
-      // Lỗi quyền truy cập thì thử lại cũng vô ích
-      retry: (count, err) => !(err instanceof AppError && err.code === 'unauthorized') && count < 2,
+      // Lỗi quyền truy cập / chưa thuộc nhà nào thì thử lại cũng vô ích
+      retry: (count, err) => !(err instanceof AppError && NO_RETRY.includes(err.code)) && count < 2,
     },
   },
 })

@@ -64,3 +64,23 @@ describe('rule chặn import sai lớp', () => {
     expectAllowed('src/engine/sub/z.ts', "import { w } from '../w'\nexport const a = w\n")
   })
 })
+
+describe('đồ thị phụ thuộc giữa các lớp', () => {
+  it('data/ không import sets, features, ui, app; vẫn import được engine và pocketbase', () => {
+    expectBlocked('src/data/a.ts', "import { getSet } from '../sets/registry'\nexport const a = getSet\n")
+    expectBlocked('src/data/b.ts', "import { copy } from '../ui/copy'\nexport const a = copy\n")
+    expectAllowed('src/data/c.ts', "import { drawSlots } from '../engine'\nimport PocketBase from 'pocketbase'\nexport const a = [drawSlots, PocketBase]\n")
+  })
+
+  it('sets/ không import data, features; vẫn import được engine và ui', () => {
+    expectBlocked('src/sets/a.ts', "import { pb } from '../data/pb'\nexport const a = pb\n")
+    expectBlocked('src/sets/food/b.ts', "import { X } from '../../features/spin/X'\nexport const a = X\n")
+    expectAllowed('src/sets/food/c.ts', "import { drawSlots } from '../../engine'\nimport { copy } from '../../ui/copy'\nexport const a = [drawSlots, copy]\n")
+  })
+
+  it('ui/ không import lớp nào khác', () => {
+    expectBlocked('src/ui/a.ts', "import { getSet } from '../sets/registry'\nexport const a = getSet\n")
+    expectBlocked('src/ui/b.ts', "import { pb } from '../data/pb'\nexport const a = pb\n")
+    expectAllowed('src/ui/c.ts', "import { x } from './x'\nexport const a = x\n")
+  })
+})

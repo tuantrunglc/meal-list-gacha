@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useItems, type Item } from '../../data/items'
-import { drawSlots, type EngineItem } from '../../engine'
+import { drawSlots, type EngineItem, type Slot } from '../../engine'
 import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
 import type { SetDefinition } from '../../sets/types'
 import { ChipGroup } from '../../ui/ChipGroup'
@@ -8,7 +8,7 @@ import { copy } from '../../ui/copy'
 import { GachaPot } from '../../ui/GachaPot'
 import { useReducedMotion } from '../../ui/useReducedMotion'
 import { MealTray, trayAnnouncement } from '../tray/MealTray'
-import { useTrayStore } from '../tray/store'
+import { useTrayStore, type DrawFn } from '../tray/store'
 import './SpinScreen.css'
 
 const SPIN_MS = 1500
@@ -51,20 +51,26 @@ export function SpinScreen({ hasHistory = false }: Props) {
     [],
   )
 
-  function spin() {
-    if (spinning || !items.data) return
-    const snapshot = itemsById
-    // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
-    const result = drawSlots({
+  const engineItems = useMemo(() => (items.data ?? []).map(toEngineItem), [items.data])
+
+  // Một hàm quay dùng chung cho mở nồi, 🎲, Đổi cả mâm, ＋ ô
+  const draw: DrawFn = (slots: Slot[]) =>
+    drawSlots({
       set,
-      items: items.data.map(toEngineItem),
+      items: engineItems,
       recentDraws: [],
       cooldownDays: set.defaultCooldownDays,
-      slots: set.slotTemplate.map((s, i) => ({ id: `slot-${i}`, groupKey: s.groupKey, itemId: null, keep: false })),
+      slots,
       filters,
       now: new Date(),
       rng: Math.random,
     })
+
+  function spin() {
+    if (spinning || !items.data) return
+    const snapshot = itemsById
+    // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
+    const result = draw(set.slotTemplate.map((s, i) => ({ id: `slot-${i}`, groupKey: s.groupKey, itemId: null, keep: false })))
     const removable = new Set(set.slotTemplate.flatMap((s, i) => (s.removable ? [`slot-${i}`] : [])))
     setSpinning(true)
     timer.current = window.setTimeout(
@@ -133,7 +139,7 @@ export function SpinScreen({ hasHistory = false }: Props) {
         {spinning ? copy.spin.spinning : copy.spin.button}
       </button>
 
-      <MealTray set={set} itemsById={itemsById} onChangeFilter={focusFilters} announcement={announcement} />
+      <MealTray set={set} itemsById={itemsById} draw={draw} onChangeFilter={focusFilters} announcement={announcement} />
     </div>
   )
 }

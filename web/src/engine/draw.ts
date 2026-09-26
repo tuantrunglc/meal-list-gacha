@@ -96,6 +96,11 @@ export function drawSlots(input: DrawInput): DrawResult {
         !blocked.has(item.id) &&
         !inTray.has(item.id),
     )
+    // Tránh trả lại đúng món cũ khi còn lựa chọn khác
+    if (slot.avoidItemId && pool.length > 1) {
+      const without = pool.filter((item) => item.id !== slot.avoidItemId)
+      if (without.length > 0) pool.splice(0, pool.length, ...without)
+    }
     const available = new Set(pool.map((item) => item.rarity))
     const rarity = nearestAvailableRarity(pickRarity(set.rarityWeights, rng), available)
     if (rarity === null) {

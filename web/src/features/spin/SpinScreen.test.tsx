@@ -187,4 +187,68 @@ describe('SpinScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
     expect(refetch).toHaveBeenCalledOnce()
   })
+
+  describe('chỉnh mâm', () => {
+    const nameOf = (id: string | null) => foodSet.seed.find((d) => d.seedKey === id)!.name
+
+    it('🔒 bật/tắt giữ với nhãn Đang giữ / Không giữ; ô giữ thì 🎲 khoá', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      const first = useTrayStore.getState().slots[0]
+      const name = nameOf(first.itemId)
+      const lock = screen.getByRole('button', { name: `${name}: Không giữ` })
+      fireEvent.click(lock)
+      expect(screen.getByRole('button', { name: `${name}: Đang giữ` })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: `Đổi món này: ${name}` })).toBeDisabled()
+      fireEvent.click(screen.getByRole('button', { name: `${name}: Đang giữ` }))
+      expect(screen.getByRole('button', { name: `${name}: Không giữ` })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('🎲 chỉ đổi ô đó, cùng nhóm, ra món khác, và đọc món mới', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      const before = useTrayStore.getState().slots
+      for (let i = 0; i < 10; i++) {
+        const cur = useTrayStore.getState().slots[1]
+        fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${nameOf(cur.itemId)}` }))
+        const after = useTrayStore.getState().slots
+        expect(after[0]).toEqual(before[0])
+        expect(after[2]).toEqual(before[2])
+        expect(after[1].groupKey).toBe(before[1].groupKey)
+        expect(after[1].itemId).not.toBe(cur.itemId)
+        expect(live()).toContain(nameOf(after[1].itemId))
+      }
+    })
+
+    it('Đổi cả mâm: ô giữ nguyên, không đóng mâm', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      const kept = useTrayStore.getState().slots[0]
+      fireEvent.click(screen.getByRole('button', { name: `${nameOf(kept.itemId)}: Không giữ` }))
+      for (let i = 0; i < 5; i++) fireEvent.click(screen.getByRole('button', { name: 'Đổi cả mâm' }))
+      expect(useTrayStore.getState().slots[0]).toMatchObject({ itemId: kept.itemId, locked: true })
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('＋ Thêm món → chọn nhóm: thêm ô có ✕; ô mặc định không có ✕; bỏ được', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      expect(screen.queryByRole('button', { name: /^Bỏ ô/ })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: '＋ Thêm món' }))
+      const picker = screen.getByRole('group', { name: 'Thêm món nhóm nào?' })
+      fireEvent.click(within(picker).getByRole('button', { name: 'Rau' }))
+      const slots = useTrayStore.getState().slots
+      expect(slots).toHaveLength(4)
+      expect(slots[3]).toMatchObject({ removable: true, status: 'filled' })
+      expect(foodSet.seed.find((d) => d.seedKey === slots[3].itemId)!.groupKey).toBe('rau')
+      const rauIds = slots.filter((x) => x.groupKey === 'rau').map((x) => x.itemId)
+      expect(new Set(rauIds).size).toBe(rauIds.length)
+      // Chọn nhóm xong: focus về "＋ Thêm món", mâm được đọc lại
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: '＋ Thêm món' }))
+      expect(live()).toBe(expectedAnnouncement())
+      fireEvent.click(screen.getByRole('button', { name: `Bỏ ô Rau: ${nameOf(slots[3].itemId)}` }))
+      expect(useTrayStore.getState().slots).toHaveLength(3)
+      expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    })
+  })
 })

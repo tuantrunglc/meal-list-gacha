@@ -164,6 +164,16 @@ describe('drawSlots', () => {
     expect(r.revealOrder).toEqual(['rau', 'canh', 'man'])
   })
 
+  it('avoidItemId: không trả lại món cũ khi còn món khác; chỉ còn món cũ thì vẫn trả', () => {
+    const items = [item('old', 'g1', 1), item('new', 'g1', 3)]
+    for (let seed = 0; seed < 20; seed++) {
+      const r = drawSlots(input({ items, slots: [{ ...slot('s1', 'g1', 'old'), avoidItemId: 'old' }], rng: createSeededRng(seed) }))
+      expect(r.slots[0].itemId).toBe('new')
+    }
+    const only = drawSlots(input({ items: [item('old', 'g1', 1)], slots: [{ ...slot('s1', 'g1', 'old'), avoidItemId: 'old' }] }))
+    expect(only.slots[0].itemId).toBe('old')
+  })
+
   it('cùng seed thì cùng kết quả', () => {
     const items = ['a', 'b', 'c', 'd'].map((s) => item(s, 'g1', 1))
     const run = () => drawSlots(input({ items, slots: [slot('s1', 'g1')], rng: createSeededRng(7) })).slots[0].itemId

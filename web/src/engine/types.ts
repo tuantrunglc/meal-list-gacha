@@ -39,6 +39,8 @@ export type Slot = {
    * Ô giữ mà chưa có món (`itemId=null`) trả về `empty`; muốn quay thì đặt `keep=false`.
    */
   keep: boolean
+  /** Khi quay lại ô này: tránh món này nếu còn món khác hợp lệ (🎲 "Đổi món này"). */
+  avoidItemId?: string | null
 }
 
 export type SlotStatus = 'filled' | 'kept' | 'empty'

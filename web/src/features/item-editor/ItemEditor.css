@@ -25,10 +25,6 @@
   outline: none;
 }
 
-.item-editor__image {
-  border-radius: var(--radius-md);
-}
-
 .item-editor__error {
   display: flex;
   align-items: center;

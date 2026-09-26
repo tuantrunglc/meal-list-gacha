@@ -190,6 +190,8 @@ export type NewItemInput = {
   rarity: Rarity
   tags: string[]
   attrs: unknown
+  /** Ảnh đã xử lý (cắt 4:3, nén) — gửi multipart. */
+  image?: File | null
 }
 
 /** Tạo món mới của Bộ. Trùng ID (lần gửi trước đã tới server) coi là thành công. */
@@ -200,7 +202,15 @@ export function useCreateItem(setKey: string) {
   const mutation = useMutation<void, AppError, NewItemInput>({
     mutationFn: async (input) => {
       if (!householdId) throw new AppError('no-household')
-      const fields = { groupKey: input.groupKey, name: input.name.trim(), rarity: input.rarity, tags: input.tags, attrs: input.attrs }
+      const fields = {
+        groupKey: input.groupKey,
+        name: input.name.trim(),
+        rarity: input.rarity,
+        tags: input.tags,
+        attrs: input.attrs,
+        // SDK tự gửi multipart khi có File
+        ...(input.image ? { image: input.image } : {}),
+      }
       try {
         await pb.collection('items').create({ ...fields, id: input.id, household: householdId, setKey, seedKey: '', deleted: false })
       } catch (err) {
@@ -208,7 +218,8 @@ export function useCreateItem(setKey: string) {
         // Lần gửi trước đã tới server (mất phản hồi) mà người dùng sửa thêm rồi thử lại:
         // cập nhật bản ghi đó để giữ đúng nội dung mới nhất
         try {
-          await pb.collection('items').update(input.id, fields)
+          // Bỏ ảnh sau lần gửi trước: xoá ảnh đã lên server (image = null)
+          await pb.collection('items').update(input.id, { ...fields, image: input.image ?? null })
         } catch (updateErr) {
           throw toAppError(updateErr)
         }

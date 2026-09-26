@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useCommitTray, type DrawEntry } from '../../data/draws'
-import { itemImageSources, type Item } from '../../data/items'
+import { useItemImages } from '../../data/files'
+import type { Item } from '../../data/items'
 import type { SetDefinition } from '../../sets/types'
 import { copy } from '../../ui/copy'
 import { DishImage } from '../../ui/DishImage'
@@ -116,6 +117,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
     if (!busy) close()
   }
   const [picking, setPicking] = useState(false)
+  const imagesOf = useItemImages()
   // Đang xem chi tiết món của ô nào (cùng một lớp modal với mâm)
   const [detailSlotId, setDetailSlotId] = useState<string | null>(null)
   const detailHeadingRef = useRef<HTMLHeadingElement>(null)
@@ -317,7 +319,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                         aria-label={copy.tray.openDetail(v.groupLabel, v.item.name, copy.rarity[v.rarity].label)}
                         onClick={() => openDetail(slot.id)}
                       >
-                        <DishImage className="meal-slot__thumb" sources={itemImageSources(v.item)} alt="" compact />
+                        <DishImage className="meal-slot__thumb" sources={imagesOf(v.item, 'thumb')} alt="" compact />
                         <span className="meal-slot__info">
                           {g && <GroupTag label={g.label} color={g.color} />}
                           <span className="meal-slot__name">{v.item.name}</span>

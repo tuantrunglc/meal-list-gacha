@@ -6,7 +6,7 @@ import { login } from './helpers.ts'
 async function softDeleteCustom(page: Page) {
   const token = await page.evaluate(() => JSON.parse(localStorage.getItem('pocketbase_auth') ?? '{}').token as string)
   if (!token) return
-  const list = await (await page.request.get(`${API}/collections/items/records?perPage=500&filter=${encodeURIComponent("seedKey = '' && deleted = false")}`, { headers: { Authorization: token } })).json()
+  const list = await (await page.request.get(`${API}/collections/items/records?perPage=500&filter=${encodeURIComponent("seedKey = '' && deleted = false && name ~ 'E2E'")}`, { headers: { Authorization: token } })).json()
   for (const it of list.items as { id: string }[]) {
     await page.request.patch(`${API}/collections/items/records/${it.id}`, { headers: { Authorization: token }, data: { deleted: true } })
   }
@@ -25,7 +25,7 @@ test('thêm món: validate, lưu thật, toast, món mới đầu lưới, chi t
   await dialog.getByRole('button', { name: 'Lưu' }).click()
   await expect(dialog.getByText('Món này tên gì nè?')).toBeVisible()
 
-  const name = `Thịt kho trứng kiểu mẹ ${Date.now()}`
+  const name = `E2E thịt kho trứng ${Date.now()}`
   await dialog.getByLabel('Tên món').fill(name)
   await dialog.getByRole('radio', { name: 'Mặn' }).click()
   await dialog.getByRole('radio', { name: '⭐⭐⭐ Đặc biệt' }).click()

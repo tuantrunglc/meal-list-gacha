@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { itemImageSources, useItems, type Item } from '../../data/items'
+import { useItemImages } from '../../data/files'
+import { useItems, type Item } from '../../data/items'
 import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
 import { ChipGroup } from '../../ui/ChipGroup'
 import { copy } from '../../ui/copy'
@@ -16,6 +17,7 @@ const ALL = '__all__'
 export function LibraryScreen() {
   const set = getSet(DEFAULT_SET_KEY)
   const items = useItems(set)
+  const imagesOf = useItemImages()
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState(ALL)
   const [facets, setFacets] = useState<Record<string, string>>(() =>
@@ -52,7 +54,7 @@ export function LibraryScreen() {
     const dots = set.facets.flatMap((f) => f.values.filter((v) => item.tags.includes(v.key)))
     return {
       name: item.name,
-      imageSources: itemImageSources(item),
+      imageSources: imagesOf(item, 'thumb'),
       group: g ? { label: g.label, color: g.color } : undefined,
       rarity: item.rarity,
       dots: dots.map((d) => ({ label: d.label, color: d.color })),

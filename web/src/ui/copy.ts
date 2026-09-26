@@ -66,6 +66,16 @@ export const copy = {
       [name, group, rarity, facets].filter(Boolean).join(', '),
     detailClose: 'Đóng',
   },
+  image: {
+    add: 'Thêm ảnh món',
+    change: 'Đổi ảnh món',
+    optionsLabel: 'Chọn ảnh',
+    camera: 'Chụp ảnh',
+    gallery: 'Chọn từ thư viện',
+    remove: 'Bỏ ảnh',
+    processing: 'Đang sửa ảnh…',
+    error: 'Ảnh này khó chịu quá, thử tấm khác nhé',
+  },
   editor: {
     addTitle: 'Thêm món',
     name: 'Tên món',

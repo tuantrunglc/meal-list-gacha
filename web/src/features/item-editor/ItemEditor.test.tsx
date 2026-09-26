@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../data/errors'
 import { foodSet } from '../../sets/food/definition'
@@ -10,6 +10,12 @@ const mutate = vi.fn<(input: Record<string, unknown>, opts?: Opts) => void>()
 const reset = vi.fn()
 let createState: { isPending: boolean; error: AppError | null; ready: boolean } = { isPending: false, error: null, ready: true }
 vi.mock('../../data/items', () => ({ useCreateItem: () => ({ mutate, reset, ...createState }) }))
+
+const processImage = vi.fn()
+vi.mock('./imageProcessing', async (orig) => ({
+  ...(await orig<typeof import('./imageProcessing')>()),
+  processImage: (f: File) => processImage(f),
+}))
 
 const onClose = vi.fn()
 const renderEditor = (prefill = {}) => render(<ItemEditor set={foodSet} prefill={prefill} onClose={onClose} />)
@@ -145,5 +151,29 @@ describe('ItemEditor', () => {
     createState = { isPending: false, error: null, ready: false }
     renderEditor({ name: 'A', groupKey: 'rau' })
     expect(screen.getByRole('button', { name: 'Lưu' })).toBeDisabled()
+  })
+
+  it('chỉ chọn ảnh cũng là đã sửa; ảnh được gửi khi lưu', async () => {
+    const processed = { file: new File(['x'], 'mon.webp', { type: 'image/webp' }), previewUrl: 'blob:p', width: 1200, height: 900 }
+    processImage.mockResolvedValue(processed)
+    renderEditor({ name: 'Có ảnh', groupKey: 'rau' })
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm ảnh món' }))
+    fireEvent.change(screen.getByTestId('image-gallery'), { target: { files: [new File(['r'], 'a.jpg', { type: 'image/jpeg' })] } })
+    await waitFor(() => expect(document.querySelector('.image-picker__preview img')).toHaveAttribute('src', 'blob:p'))
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+    expect(mutate.mock.calls[0][0].image).toBe(processed.file)
+  })
+
+  it('đang xử lý ảnh thì chưa lưu, chưa đóng được', async () => {
+    let resolve!: (v: unknown) => void
+    processImage.mockReturnValue(new Promise((r) => (resolve = r)))
+    renderEditor({ name: 'A', groupKey: 'rau' })
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm ảnh món' }))
+    fireEvent.change(screen.getByTestId('image-gallery'), { target: { files: [new File(['r'], 'a.jpg', { type: 'image/jpeg' })] } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Lưu' })).toBeDisabled())
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    await act(async () => resolve({ file: new File(['x'], 'm.webp'), previewUrl: 'blob:q', width: 1, height: 1 }))
+    expect(screen.getByRole('button', { name: 'Lưu' })).toBeEnabled()
   })
 })

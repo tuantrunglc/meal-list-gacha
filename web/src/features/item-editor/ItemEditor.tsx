@@ -5,10 +5,10 @@ import type { Rarity } from '../../engine'
 import type { SetDefinition } from '../../sets/types'
 import { ChipGroup } from '../../ui/ChipGroup'
 import { copy } from '../../ui/copy'
-import { DishImage } from '../../ui/DishImage'
 import { Modal } from '../../ui/Modal'
 import { rarityColor } from '../../ui/RarityBadge'
 import { showToast } from '../../ui/toast'
+import { ImagePicker, type PickedImage } from './ImagePicker'
 import './ItemEditor.css'
 
 export type EditorPrefill = {
@@ -30,6 +30,7 @@ type FormState = {
   facets: Record<string, string>
   rarity: Rarity
   attrs: unknown
+  image: PickedImage
 }
 
 function initialState(set: SetDefinition, prefill: EditorPrefill = {}): FormState {
@@ -45,6 +46,7 @@ function initialState(set: SetDefinition, prefill: EditorPrefill = {}): FormStat
     ),
     rarity: 1,
     attrs: set.emptyAttrs(),
+    image: null,
   }
 }
 
@@ -60,6 +62,7 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState<{ name?: string; group?: string }>({})
   const [confirming, setConfirming] = useState(false)
+  const [imageBusy, setImageBusy] = useState(false)
   // ID sinh một lần: thử lại sau lỗi dùng lại đúng ID này
   const [id] = useState(newId)
   const create = useCreateItem(set.setKey)
@@ -67,8 +70,18 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
   const groupRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const AttrsEditor = set.AttrsEditor
-  const dirty = JSON.stringify(form) !== JSON.stringify(initial)
-  const busy = create.isPending
+  const dirty = JSON.stringify({ ...form, image: form.image?.previewUrl ?? null }) !== JSON.stringify({ ...initial, image: null })
+
+  // Bỏ URL xem trước khi đóng form
+  const imageRef = useRef(form.image)
+  useEffect(() => {
+    imageRef.current = form.image
+  }, [form.image])
+  useEffect(() => () => {
+    if (imageRef.current) URL.revokeObjectURL(imageRef.current.previewUrl)
+  }, [])
+  // Đang lưu hoặc đang sửa ảnh: không lưu/đóng được
+  const busy = create.isPending || imageBusy
 
   // Đang sửa dở mà đóng/tải lại tab: trình duyệt hỏi lại
   useEffect(() => {
@@ -124,6 +137,7 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
         tags: Object.values(form.facets).filter(Boolean),
         // Trình soạn của Bộ luôn cho ra attrs đúng dạng; nếu không thì lưu công thức rỗng đã chuẩn hoá
         attrs: parsed.ok ? parsed.value : (set.parseAttrs(set.emptyAttrs()) as { value: unknown }).value,
+        image: form.image?.file ?? null,
       },
       {
         onSuccess: () => {
@@ -156,12 +170,17 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
           </div>
         ) : (
           <form onSubmit={onSubmit} noValidate>
-            <fieldset className="item-editor__fields" disabled={busy}>
+            <fieldset className="item-editor__fields" disabled={create.isPending}>
               <h2 className="item-editor__title" tabIndex={-1} ref={titleRef}>
                 {copy.editor.addTitle}
               </h2>
 
-              <DishImage className="item-editor__image" sources={[]} alt="" />
+              <ImagePicker
+                value={form.image}
+                onChange={(image) => update({ image })}
+                disabled={create.isPending}
+                onBusyChange={setImageBusy}
+              />
 
               <div className="field">
                 <label className="field__label" htmlFor="editor-name">
@@ -227,7 +246,7 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
                 />
               </div>
 
-              <AttrsEditor value={form.attrs} onChange={(attrs) => update({ attrs })} disabled={busy} />
+              <AttrsEditor value={form.attrs} onChange={(attrs) => update({ attrs })} disabled={create.isPending} />
             </fieldset>
 
             {create.error && (
@@ -244,7 +263,7 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
                 {copy.editor.cancel}
               </button>
               <button type="submit" className="button-primary" disabled={busy || !create.ready}>
-                {busy ? copy.editor.saving : copy.editor.save}
+                {create.isPending ? copy.editor.saving : copy.editor.save}
               </button>
             </div>
           </form>

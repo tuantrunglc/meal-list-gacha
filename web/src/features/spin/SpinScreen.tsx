@@ -11,7 +11,7 @@ import { copy } from '../../ui/copy'
 import { GachaPot } from '../../ui/GachaPot'
 import { rarityFeedback } from '../../ui/feedback'
 import { useSoundEnabled } from '../../ui/preferences'
-import { preloadSounds, unlockAudio } from '../../ui/sound'
+import { playPotBoom, preloadSounds, startPotRumble, unlockAudio } from '../../ui/sound'
 import { useReducedMotion } from '../../ui/useReducedMotion'
 import { ItemEditor, type EditorPrefill } from '../item-editor/ItemEditor'
 import { MealTray, trayAnnouncement } from '../tray/MealTray'
@@ -64,6 +64,8 @@ export function SpinScreen() {
   const spinButton = useRef<HTMLButtonElement>(null)
   const timer = useRef<number | undefined>(undefined)
   const lidTimer = useRef<number | undefined>(undefined)
+  // Dừng tiếng nồi sôi đang lặp
+  const stopRumble = useRef<(() => void) | undefined>(undefined)
 
   const itemsById = useMemo(() => new Map((items.data ?? []).map((i) => [i.id, i])), [items.data])
 
@@ -71,6 +73,7 @@ export function SpinScreen() {
     () => () => {
       window.clearTimeout(timer.current)
       window.clearTimeout(lidTimer.current)
+      stopRumble.current?.()
       // Rời màn Quay thì đóng mâm; quay lại không tự bật mâm cũ
       useTrayStore.getState().close()
     },
@@ -104,6 +107,8 @@ export function SpinScreen() {
     // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
     const result = draw(set.slotTemplate.map((s, i) => ({ id: `slot-${i}`, groupKey: s.groupKey, itemId: null, keep: false })))
     const removable = new Set(set.slotTemplate.flatMap((s, i) => (s.removable ? [`slot-${i}`] : [])))
+    // Nồi sôi rung lục cục tới lúc nắp bật (giảm chuyển động: nồi không bật nắp → không có tiếng nồi)
+    if (soundOn && !reducedMotion) stopRumble.current = startPotRumble()
     setSpinning(true)
     setBusy(true)
     timer.current = window.setTimeout(
@@ -125,6 +130,11 @@ export function SpinScreen() {
         const legend = rarities.includes(3)
         // Nắp bật tung trước (⭐⭐: lóe xanh), mâm mở khi nắp lên tới đỉnh, rồi thẻ bật lần lượt
         const popLid = () => {
+          if (stopRumble.current) {
+            stopRumble.current()
+            stopRumble.current = undefined
+            playPotBoom()
+          }
           setPotTeasing(false)
           setPotFlash(legend ? 'legend' : rarities.includes(2) ? 'rare' : null)
           setPotOpening(true)

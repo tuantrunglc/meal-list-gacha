@@ -36,9 +36,15 @@ let recentState: { isPending: boolean; fetchStatus: string; error: AppError | nu
 }
 let hasDraws = false
 
-const fb = vi.hoisted(() => ({ feedback: vi.fn(), unlock: vi.fn(), preload: vi.fn() }))
+const fb = vi.hoisted(() => ({ feedback: vi.fn(), unlock: vi.fn(), preload: vi.fn(), stopRumble: vi.fn(), rumble: vi.fn(), boom: vi.fn() }))
 vi.mock('../../ui/feedback', () => ({ rarityFeedback: fb.feedback }))
-vi.mock('../../ui/sound', () => ({ unlockAudio: fb.unlock, preloadSounds: fb.preload, playRaritySound: vi.fn() }))
+vi.mock('../../ui/sound', () => ({
+  unlockAudio: fb.unlock,
+  preloadSounds: fb.preload,
+  playRaritySound: vi.fn(),
+  startPotRumble: fb.rumble,
+  playPotBoom: fb.boom,
+}))
 const setConfigMock = vi.hoisted(() => ({ cooldownDays: null as number | null, loaded: true, failed: false, refetch: vi.fn() }))
 vi.mock('../../data/setConfig', () => ({
   useSetConfig: () => ({
@@ -122,6 +128,9 @@ describe('SpinScreen', () => {
     fb.feedback.mockClear()
     fb.unlock.mockClear()
     fb.preload.mockClear()
+    fb.stopRumble.mockClear()
+    fb.rumble.mockReset().mockReturnValue(fb.stopRumble)
+    fb.boom.mockClear()
     window.localStorage.removeItem('noi-than:sound')
     useTrayStore.setState({ ...initialTray, open: false, slots: [], commitId: null })
     commitMutate.mockReset()
@@ -894,6 +903,58 @@ describe('SpinScreen', () => {
       ])
     })
 
+    it('âm thanh bật: nồi rung suốt lúc sôi (kể cả nhá hàng ⭐⭐⭐), nắp bật thì dừng rung và "bùm" một lần', () => {
+      window.localStorage.setItem('noi-than:sound', 'on')
+      state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
+      render(<SpinScreen />, { wrapper: Providers })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      expect(fb.rumble).toHaveBeenCalledTimes(1)
+      // mở khoá trước khi rung (iOS)
+      expect(fb.unlock.mock.invocationCallOrder[0]).toBeLessThan(fb.rumble.mock.invocationCallOrder[0])
+      act(() => vi.advanceTimersByTime(1600))
+      // đang nhá hàng: vẫn rung
+      expect(document.querySelector('.gacha-pot--teasing')).not.toBeNull()
+      expect(fb.stopRumble).not.toHaveBeenCalled()
+      expect(fb.boom).not.toHaveBeenCalled()
+      act(() => vi.advanceTimersByTime(TEASE_MS))
+      expect(fb.stopRumble).toHaveBeenCalledTimes(1)
+      expect(fb.boom).toHaveBeenCalledTimes(1)
+      expect(fb.stopRumble.mock.invocationCallOrder[0]).toBeLessThan(fb.boom.mock.invocationCallOrder[0])
+      act(() => vi.advanceTimersByTime(5000))
+      expect(fb.boom).toHaveBeenCalledTimes(1)
+      expect(fb.rumble).toHaveBeenCalledTimes(1)
+    })
+
+    it('âm thanh bật, không có ⭐⭐⭐: nắp bật ngay sau lúc sôi → dừng rung và "bùm"', () => {
+      window.localStorage.setItem('noi-than:sound', 'on')
+      state = { ...state, data: toItems((d) => d.rarity === 1) }
+      render(<SpinScreen />, { wrapper: Providers })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      act(() => vi.advanceTimersByTime(1400))
+      expect(fb.boom).not.toHaveBeenCalled()
+      act(() => vi.advanceTimersByTime(200))
+      expect(fb.stopRumble).toHaveBeenCalledTimes(1)
+      expect(fb.boom).toHaveBeenCalledTimes(1)
+    })
+
+    it('âm thanh tắt: không có tiếng nồi', () => {
+      render(<SpinScreen />, { wrapper: Providers })
+      spinToTray()
+      expect(fb.rumble).not.toHaveBeenCalled()
+      expect(fb.boom).not.toHaveBeenCalled()
+    })
+
+    it('rời màn Quay lúc nồi đang sôi: dừng rung, không "bùm"', () => {
+      window.localStorage.setItem('noi-than:sound', 'on')
+      const { unmount } = render(<SpinScreen />, { wrapper: Providers })
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      act(() => vi.advanceTimersByTime(500))
+      unmount()
+      expect(fb.stopRumble).toHaveBeenCalledTimes(1)
+      act(() => vi.advanceTimersByTime(5000))
+      expect(fb.boom).not.toHaveBeenCalled()
+    })
+
     it('bỏ qua giữa chừng: một phản hồi theo bậc cao nhất của các thẻ chưa bật (⭐⭐⭐ không bị nuốt); mở lại mâm cũ không phát', () => {
       state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
       render(<SpinScreen />, { wrapper: Providers })
@@ -946,6 +1007,9 @@ describe('SpinScreen', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
         act(() => vi.advanceTimersByTime(310))
         expect(calls()).toEqual([[3, true]])
+        // nồi không bật nắp: không có tiếng nồi rung / "bùm"
+        expect(fb.rumble).not.toHaveBeenCalled()
+        expect(fb.boom).not.toHaveBeenCalled()
         const slot = useTrayStore.getState().slots[0]
         const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
         fb.feedback.mockClear()

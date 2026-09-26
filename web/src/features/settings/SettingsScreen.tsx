@@ -135,7 +135,7 @@ export function SettingsScreen() {
                 // trong thao tác chạm: mở khoá audio, tải sẵn và phát thử
                 unlockAudio()
                 preloadSounds()
-                playRaritySound(2)
+                playRaritySound(2, { late: true })
               }
             }}
           >

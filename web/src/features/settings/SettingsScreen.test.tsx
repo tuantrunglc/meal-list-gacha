@@ -172,7 +172,8 @@ describe('SettingsScreen', () => {
     // bật: mở khoá audio trong lần chạm, tải sẵn, phát thử "ting"
     expect(snd.unlock).toHaveBeenCalledTimes(1)
     expect(snd.preload).toHaveBeenCalledTimes(1)
-    expect(snd.play).toHaveBeenCalledWith(2)
+    // phát thử: không bỏ dù lần đầu tải chậm
+    expect(snd.play).toHaveBeenCalledWith(2, { late: true })
     // iOS: mở khoá trước khi phát
     expect(snd.unlock.mock.invocationCallOrder[0]).toBeLessThan(snd.play.mock.invocationCallOrder[0])
     // tắt: im lặng

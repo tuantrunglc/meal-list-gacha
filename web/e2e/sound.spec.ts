@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { login, trayReady } from './helpers.ts'
 
-test('âm thanh tắt: không tải file âm thanh; bật ở Cài đặt: tải 3 file nhỏ, quay không lỗi', async ({ page }) => {
+test('âm thanh tắt: không tải file âm thanh; bật ở Cài đặt: tải 5 file nhỏ, quay không lỗi', async ({ page }) => {
   const soundRequests: string[] = []
   page.on('request', (r) => {
     if (r.url().includes('/sounds/')) soundRequests.push(r.url())
@@ -31,7 +31,7 @@ test('âm thanh tắt: không tải file âm thanh; bật ở Cài đặt: tải
 
   await page.getByRole('link', { name: 'Mở cài đặt' }).click()
   const responses = Promise.all(
-    ['bup.wav', 'ting.wav', 'ting-ting-tinh.wav'].map((f) => page.waitForResponse((r) => r.url().endsWith(`/sounds/${f}`))),
+    ['soi.wav', 'bum.wav', 'bup.wav', 'ting.wav', 'ting-ting-tinh.wav'].map((f) => page.waitForResponse((r) => r.url().endsWith(`/sounds/${f}`))),
   )
   await page.getByRole('switch', { name: 'Âm thanh khi mở nồi' }).click()
   for (const res of await responses) {
@@ -47,7 +47,7 @@ test('âm thanh tắt: không tải file âm thanh; bật ở Cài đặt: tải
   await expect(spin).toBeEnabled({ timeout: 15_000 })
   await spin.click()
   await trayReady(page)
-  // mỗi thẻ bật một tiếng
-  await expect.poll(played).toBe(4)
+  // nồi rung + "bùm" + mỗi thẻ bật một tiếng
+  await expect.poll(played).toBe(6)
   expect(errors).toEqual([])
 })

@@ -163,6 +163,12 @@ describe('itemImageSources', () => {
     expect(sources[0]).toContain('thumb=400x300')
     expect(sources[1]).toBe('/seed/ca-kho-to.webp')
   })
+  it('cỡ full (chi tiết) dùng ảnh gốc, không thumb', () => {
+    const [full] = itemImageSources({ ...base, imageFile: 'a.webp' }, undefined, 'full')
+    expect(full).toContain('/api/files/c/i1/a.webp')
+    expect(full).not.toContain('thumb=')
+  })
+
   it('món tự thêm chưa có ảnh thì không có nguồn', () => {
     expect(itemImageSources(base)).toEqual([])
   })

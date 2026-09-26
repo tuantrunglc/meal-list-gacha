@@ -49,3 +49,29 @@ test('chỉnh mâm: giữ + đổi cả mâm, thêm/bỏ ô, nút ≥ 44px', asy
   await dialog.getByRole('button', { name: /^Bỏ ô Canh/ }).click()
   await expect(dialog.getByRole('listitem')).toHaveCount(3)
 })
+
+test('chi tiết món: mở từ mâm, một lớp modal, chữ lớn không tràn ngang', async ({ page }) => {
+  await login(page)
+  await expect(page.getByRole('button', { name: 'Mở nồi!' })).toBeEnabled({ timeout: 15_000 })
+  await page.getByRole('button', { name: 'Mở nồi!' }).click()
+  const dialog = page.getByRole('dialog')
+  const open = dialog.getByRole('button', { name: /^Xem công thức: / }).first()
+  const name = (await open.locator('.meal-slot__name').textContent())!
+  await open.click()
+  await expect(page.getByRole('dialog', { name: `Chi tiết món ${name}` })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+  await expect(dialog.getByRole('heading', { level: 2, name })).toBeFocused()
+  await expect(dialog.getByRole('heading', { name: 'Các bước' })).toBeVisible()
+
+  // Cỡ chữ lớn nhất: phóng root font lên 200%
+  await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+  const overflow = await page.evaluate(() => {
+    const d = document.querySelector('[role="dialog"]') as HTMLElement
+    return { doc: document.documentElement.scrollWidth - window.innerWidth, dialog: d.scrollWidth - d.clientWidth }
+  })
+  expect(overflow.doc).toBeLessThanOrEqual(0)
+  expect(overflow.dialog).toBeLessThanOrEqual(0)
+
+  await dialog.getByRole('button', { name: '← Về mâm' }).click()
+  await expect(dialog.getByRole('button', { name: new RegExp(`^Xem công thức: .*${name}`) })).toBeFocused()
+})

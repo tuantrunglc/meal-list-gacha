@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import { foodSet } from '../src/sets/food/definition'
+import { foodSeed } from '../src/sets/food/seed'
 import { ADMIN, PB_PORT } from './env.ts'
 import { login } from './helpers.ts'
 
@@ -26,19 +26,19 @@ async function apiLogin(request: APIRequestContext, collection: string, identity
 async function seededItems(page: Page, request: APIRequestContext) {
   await login(page)
   const token = await authToken(page)
-  await expect.poll(async () => (await listItems(request, token)).totalItems, { timeout: 15_000 }).toBe(foodSet.seed.length)
+  await expect.poll(async () => (await listItems(request, token)).totalItems, { timeout: 15_000 }).toBe(foodSeed.length)
   return { token, items: (await listItems(request, token)).items }
 }
 
 test('vào app thì nồi có đủ đúng món mặc định, không báo lỗi, tải lại không nhân đôi', async ({ page, request }) => {
   const { token, items } = await seededItems(page, request)
-  expect(items.map((i) => i.seedKey).sort()).toEqual(foodSet.seed.map((d) => d.seedKey).sort())
+  expect(items.map((i) => i.seedKey).sort()).toEqual(foodSeed.map((d) => d.seedKey).sort())
   await expect(page.getByRole('alert')).toHaveCount(0)
 
   await page.reload()
   await page.getByRole('heading', { name: 'Nay ăn gì cả nhà?' }).waitFor()
   await page.waitForLoadState('networkidle')
-  expect((await listItems(request, token)).totalItems).toBe(foodSet.seed.length)
+  expect((await listItems(request, token)).totalItems).toBe(foodSeed.length)
 })
 
 test('unique index chặn trùng seedKey trong một household', async ({ page, request }) => {

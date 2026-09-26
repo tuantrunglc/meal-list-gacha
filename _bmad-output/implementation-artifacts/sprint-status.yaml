@@ -42,8 +42,8 @@ development_status:
   1-4-nồi-có-sẵn-món-mặc-định: review
   1-5-mở-nồi-ra-mâm-cơm: review
   1-6-chỉnh-mâm-đổi-món-giữ-món-thêm-ô-đổi-cả-mâm: review
-  1-7-xem-chi-tiết-món-và-công-thức: in-progress
-  1-8-chốt-mâm-và-tránh-trùng: backlog
+  1-7-xem-chi-tiết-món-và-công-thức: review
+  1-8-chốt-mâm-và-tránh-trùng: in-progress
   1-9-deploy-website-nồi-thần-lên-vps: backlog
   epic-1-retrospective: optional
 

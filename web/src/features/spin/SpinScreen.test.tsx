@@ -251,4 +251,62 @@ describe('SpinScreen', () => {
       expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
     })
   })
+
+  describe('chi tiết món', () => {
+    it('món biến mất khi đang xem chi tiết: về mâm, focus trong dialog, Esc đóng ngay', () => {
+      const { rerender } = render(<SpinScreen />)
+      spinAndWait()
+      const slot = useTrayStore.getState().slots[0]
+      const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
+      state = { ...state, data: state.data!.filter((i) => i.id !== slot.itemId) }
+      rerender(<SpinScreen />)
+      expect(screen.getByRole('dialog', { name: 'Mâm cơm' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('nút mở chi tiết vẫn đọc nhóm và độ hiếm', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      const slot = useTrayStore.getState().slots[0]
+      const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+      const g = foodSet.groups.find((x) => x.key === d.groupKey)!.label
+      const r = { 1: 'Thường', 2: 'Ngon', 3: 'Đặc biệt' }[d.rarity]
+      const btn = screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) })
+      expect(btn).toHaveAccessibleName(expect.stringContaining(g))
+      expect(btn).toHaveAccessibleName(expect.stringContaining(r))
+    })
+
+    it('chạm ô mở chi tiết trong cùng dialog; Về mâm quay lại đúng mâm và focus về ô', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      const slot = useTrayStore.getState().slots[1]
+      fireEvent.click(screen.getByRole('button', { name: `${foodSet.seed.find((d) => d.seedKey === slot.itemId)!.name}: Không giữ` }))
+      const before = useTrayStore.getState().slots
+      const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
+      expect(screen.getAllByRole('dialog')).toHaveLength(1)
+      const heading = screen.getByRole('heading', { level: 2, name: d.name })
+      expect(document.activeElement).toBe(heading)
+      expect(screen.getByRole('heading', { name: 'Các bước' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: '← Về mâm' }))
+      expect(useTrayStore.getState().slots).toEqual(before)
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
+    })
+
+    it('Esc ở chi tiết thì về mâm, Esc lần nữa thì đóng mâm', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      const d = foodSet.seed.find((x) => x.seedKey === useTrayStore.getState().slots[0].itemId)!
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
+      expect(screen.getByRole('dialog', { name: `Chi tiết món ${d.name}` })).toBeInTheDocument()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.getByRole('button', { name: 'Đổi cả mâm' })).toBeInTheDocument()
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+  })
 })

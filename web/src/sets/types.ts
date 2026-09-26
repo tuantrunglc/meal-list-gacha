@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import type { EngineFacet, EngineSet, Rarity } from '../engine'
 
 export type GroupDefinition = {
@@ -51,6 +52,8 @@ export type SetDefinition<A = unknown> = Omit<EngineSet, 'facets'> & {
     /** Nút mở lại bộ lọc facet, ví dụ "Đổi mùa". */
     changeFilter: string
   }
+  /** Hiển thị phần riêng của Bộ trong Chi tiết món (ví dụ công thức). */
+  DetailView: ComponentType<{ attrs: unknown }>
   /** Kiểm tra `items.attrs` theo schema riêng của Bộ. */
   parseAttrs: (raw: unknown) => AttrsResult<A>
   seed: readonly SeedItem<A>[]

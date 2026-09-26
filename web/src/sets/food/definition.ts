@@ -1,6 +1,7 @@
 import type { SetDefinition } from '../types'
 import { parseFoodAttrs, type FoodAttrs } from './attrs'
 import { foodCopy } from './copy'
+import { FoodDetail } from './FoodDetail'
 import { foodSeed } from './seed'
 
 /** Mùa mặc định theo tháng (giờ máy): Xuân 2–4, Hạ 5–7, Thu 8–10, Đông 11–1. */
@@ -43,6 +44,7 @@ export const foodSet: SetDefinition<FoodAttrs> = {
     },
   ],
   messages: { emptySlot: foodCopy.emptySlot, changeFilter: foodCopy.changeFilter },
+  DetailView: FoodDetail,
   parseAttrs: parseFoodAttrs,
   seed: foodSeed,
 }

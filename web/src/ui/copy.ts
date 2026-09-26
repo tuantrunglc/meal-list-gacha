@@ -46,6 +46,9 @@ export const copy = {
     add: '＋ Thêm món',
     addPick: 'Thêm món nhóm nào?',
     addCancel: 'Thôi',
+    openDetail: (group: string, name: string, rarity: string) => `Xem công thức: ${group} ${name}, ${rarity}`,
+    detailTitle: (name: string) => `Chi tiết món ${name}`,
+    backToTray: '← Về mâm',
   },
   screens: {
     library: 'Sổ món của nhà',

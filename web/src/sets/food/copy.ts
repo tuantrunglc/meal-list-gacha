@@ -6,4 +6,7 @@ export const foodCopy = {
   seasons: { xuan: 'Xuân', ha: 'Hạ', thu: 'Thu', dong: 'Đông', 'quanh-nam': 'Quanh năm' },
   emptySlot: (group: string) => `Hết món ${group} mùa này rồi 😅`,
   changeFilter: 'Đổi mùa',
+  ingredients: 'Nguyên liệu',
+  steps: 'Các bước',
+  note: 'Ghi chú',
 } as const

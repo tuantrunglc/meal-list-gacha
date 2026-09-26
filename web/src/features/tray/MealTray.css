@@ -203,3 +203,46 @@
   margin-top: 0;
   color: var(--color-ink-secondary);
 }
+
+/* Vùng ảnh + chữ của ô là một nút mở Chi tiết món */
+.meal-slot__open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.meal-slot__open:focus-visible {
+  outline: 2px solid var(--color-accent-tile);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+.meal-slot__open .meal-slot__info,
+.meal-slot__open .meal-slot__name {
+  display: block;
+}
+
+.tray-dialog__back {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-bottom: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-primary);
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  cursor: pointer;
+}

@@ -96,3 +96,22 @@ test('chi tiết món: mở từ mâm, một lớp modal, chữ lớn không tr�
   await dialog.getByRole('button', { name: '← Về mâm' }).click()
   await expect(dialog.getByRole('button', { name: new RegExp(`^Xem công thức: .*${name}`) })).toBeFocused()
 })
+
+test('không giảm chuyển động: thẻ thật sự bật (có animation), nồi "thở"', async ({ page }) => {
+  await login(page)
+  const spin = page.getByRole('button', { name: 'Mở nồi!' })
+  await expect(spin).toBeEnabled({ timeout: 15_000 })
+  expect(await page.locator('.gacha-pot').evaluate((el) => getComputedStyle(el).animationName)).toBe('pot-breathe')
+  await spin.click()
+  // bắt được lúc một thẻ đang bật: mờ dần hoặc đang co giãn
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll<HTMLElement>('.meal-slot:not(.meal-slot--pending)')].some((el) => {
+        const s = getComputedStyle(el)
+        return Number(s.opacity) < 0.99 || (s.transform !== 'none' && s.transform !== 'matrix(1, 0, 0, 1, 0, 0)')
+      }),
+    undefined,
+    { timeout: 10_000, polling: 'raf' },
+  )
+  await trayReady(page)
+})

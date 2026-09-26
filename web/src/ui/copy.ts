@@ -28,6 +28,7 @@ export const copy = {
     empty: 'Thêm ảnh',
   },
   retry: 'Thử lại',
+  routeError: 'Không mở được màn này (mạng chập chờn hoặc app vừa cập nhật). Tải lại nhé.',
   spin: {
     setPicker: (label: string) => `Bộ: ${label}`,
     greeting: 'Nay ăn gì cả nhà?',

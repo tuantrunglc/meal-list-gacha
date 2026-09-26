@@ -2,7 +2,7 @@
 title: 'Story 4.4: Giảm chuyển động'
 type: 'feature'
 created: '2026-09-26'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'cd9aed179e824b71db03c5973345afbcad05f816'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -52,7 +52,7 @@ context:
 **Execution:**
 - [x] `web/src/features/spin/SpinScreen.css` -- tắt transition nút Quay khi reduce.
 - [x] `web/src/app/App.tsx` -- `MotionConfig reducedMotion="user"` (+ `LazyMotion`/`m`, Cài đặt tải lười).
-- [x] `web/src/test/reducedMotion.test.ts` -- test kiến trúc (CSS + JS).
+- [x] `web/tests/reducedMotion.test.ts` -- test kiến trúc (CSS + JS), đọc file bằng fs.
 - [x] `web/src/features/spin/SpinScreen.test.tsx` -- độ hiếm vẫn nhận ra khi reduce.
 - [x] `web/e2e/reduced-motion.spec.ts` -- chạy thật với reduce.
 
@@ -63,11 +63,22 @@ context:
 
 - Phần lớn nhánh giảm chuyển động đã làm cùng 4.1–4.3 (nồi, bật thẻ, hiệu ứng, lật, phản hồi); story này rà toàn app và khoá lại bằng test kiến trúc (`src/test/reducedMotion.test.ts`, đọc mã nguồn qua `import.meta.glob(?raw)`).
 - Nút Quay còn transition khi nhấn → thêm khối reduce.
+- Sau review: `ui/MotionProvider` (LazyMotion `strict` + MotionConfig) dùng chung cho App và test; `RouteErrorBoundary` cho màn tải lười.
 - Bundle chính vượt 500KB từ khi thêm `motion` (4.1): chuyển sang `LazyMotion` + `m` (−47KB) và tải lười màn Cài đặt → 498KB.
 
 ## Spec Change Log
 
 ## Review Triage Log
+
+| # | Nguồn | Finding | Verdict | Bằng chứng | Route |
+|---|---|---|---|---|---|
+| 1 | blind, verif | Test kiến trúc CSS pass giả: trong vitest CSS `?raw` là chuỗi rỗng | high | Thăm dò: mọi file CSS độ dài 0 | patch — chuyển sang `tests/` (môi trường node, đọc bằng fs); thử đột biến: CSS chỉ có `transition-duration` và `el.animate()` không hook đều làm test đỏ |
+| 2 | blind, edge | Chunk Cài đặt tải lỗi làm sập cả app; fallback rỗng | high | Không có ErrorBoundary | patch — `RouteErrorBoundary` (báo lỗi + tải lại), fallback "Đang tải cài đặt…"; test |
+| 3 | blind | Test có thể bị qua mặt bởi `useReducedMotion` của motion; không chặn `motion.*` (LazyMotion strict sẽ ném lỗi khi chạy) | medium | | patch — kiểm đúng đường import hook chung, cấm `motion.*`/import `motion`, kiểm cả `.animate(`; bắt cả thuộc tính con |
+| 4 | edge, verif | Unit test render `m.li` ngoài LazyMotion; không e2e nào chứng minh thẻ thật sự có animation ở chế độ thường | medium | | patch — `ui/MotionProvider` dùng chung cho App và test; e2e chế độ thường bắt thẻ đang mờ/co giãn và nồi "thở" |
+| 5 | verif, blind | `.spin-button` reduce chỉ kiểm bằng văn bản; e2e kiểm class hiệu ứng muộn; `getAnimations` không xét con | low | | patch — kiểm `transitionDuration` 0s, MutationObserver ghi mọi class hiệu ứng suốt lượt, `getAnimations({subtree:true})` |
+| 6 | blind | Kiểm "chỉ một file đọc media query" bằng văn bản thuần | low | Đủ cho quy ước hiện tại; chú thích nhắc tới sẽ báo nhầm là chấp nhận được | reject |
+| 7 | blind | Không test đổi cài đặt hệ thống giữa phiên | low | `useSyncExternalStore` + listener `change` (Story 1.5) | reject |
 
 ## Verification
 

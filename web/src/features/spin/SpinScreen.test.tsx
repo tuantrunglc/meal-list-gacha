@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
+import { MotionProvider } from '../../ui/MotionProvider'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../data/errors'
 import type { Item, ItemsResult } from '../../data/items'
@@ -8,6 +10,15 @@ import { BURST_MS } from '../../ui/RarityBurst'
 import { FLIP_MS, LEGEND_BEAT_MS, REVEAL_FIRST_MS, REVEAL_SETTLE_MS, REVEAL_STEP_MS } from '../tray/MealTray'
 import { useTrayStore } from '../tray/store'
 import { LID_LEAD_MS, SpinScreen, TEASE_MS } from './SpinScreen'
+
+// Như gốc app: router + MotionProvider (m.* chỉ chạy bên trong LazyMotion)
+function Providers({ children }: { children: ReactNode }) {
+  return (
+    <MemoryRouter>
+      <MotionProvider>{children}</MotionProvider>
+    </MemoryRouter>
+  )
+}
 
 const refetch = vi.fn(async () => {})
 let state: ItemsResult
@@ -128,7 +139,7 @@ describe('SpinScreen', () => {
   afterEach(() => vi.useRealTimers())
 
   it('mặc định chọn mùa theo tháng (tháng 9 → Thu), có gợi ý lần đầu và tiêu đề Bộ', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     expect(screen.getByRole('radio', { name: 'Thu' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText('Mở thử đi cả nhà!')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Bộ: Món ăn/ })).toHaveAttribute('aria-disabled', 'true')
@@ -139,7 +150,7 @@ describe('SpinScreen', () => {
     useTrayStore.setState({ showResult })
     // không có ⭐⭐⭐ (không nhá hàng, không nhịp chậm): thời gian cố định
     state = { ...state, data: toItems((d) => d.rarity !== 3) }
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
     expect(screen.getByRole('button', { name: 'Nồi đang sôi…' })).toHaveAttribute('aria-disabled', 'true')
     act(() => vi.advanceTimersByTime(500))
@@ -180,7 +191,7 @@ describe('SpinScreen', () => {
   })
 
   it('chạm khi đang bật thẻ: hiện cả mâm ngay, mở khoá, đọc mâm một lần', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     spinToTray()
     act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
     const dialog = screen.getByRole('dialog', { name: 'Mâm cơm' })
@@ -198,7 +209,7 @@ describe('SpinScreen', () => {
   })
 
   it('bàn phím: Enter trên mâm hoặc nút ẩn "Hiện cả mâm ngay" bỏ qua phần bật thẻ', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     spinToTray()
     const dialog = screen.getByRole('dialog', { name: 'Mâm cơm' })
     // nút bỏ qua nằm trong dialog (trình đọc thấy, Tab tới được)
@@ -214,7 +225,7 @@ describe('SpinScreen', () => {
   })
 
   it('Esc khi đang bật: đóng mâm; mở lại mâm cũ thì hiện đủ, không bật lại', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     spinToTray()
     act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -231,7 +242,7 @@ describe('SpinScreen', () => {
       removeEventListener: () => {},
     }))
     try {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
       act(() => vi.advanceTimersByTime(250))
       expect(screen.queryByRole('dialog')).toBeNull()
@@ -250,7 +261,7 @@ describe('SpinScreen', () => {
   })
 
   it('đóng mâm thì focus về nút Mở nồi!; Tab không thoát khỏi mâm', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     screen.getByRole('button', { name: 'Mở nồi!' }).focus()
     spinAndWait()
     const dialog = screen.getByRole('dialog')
@@ -263,14 +274,14 @@ describe('SpinScreen', () => {
   })
 
   it('rời màn Quay thì đóng mâm', () => {
-    const { unmount } = render(<SpinScreen />, { wrapper: MemoryRouter })
+    const { unmount } = render(<SpinScreen />, { wrapper: Providers })
     spinAndWait()
     unmount()
     expect(useTrayStore.getState().open).toBe(false)
   })
 
   it('mùa Thu: mọi món trên mâm là món Thu hoặc quanh năm', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     spinAndWait()
     for (const s of useTrayStore.getState().slots) {
       const tags = foodSet.seed.find((d) => d.seedKey === s.itemId)!.tags
@@ -279,7 +290,7 @@ describe('SpinScreen', () => {
   })
 
   it('đổi chip sang Hạ rồi quay thì chỉ ra món Hạ hoặc quanh năm', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     fireEvent.click(screen.getByRole('radio', { name: 'Hạ' }))
     expect(screen.getByRole('radio', { name: 'Hạ' })).toHaveAttribute('aria-checked', 'true')
     spinAndWait()
@@ -291,7 +302,7 @@ describe('SpinScreen', () => {
 
   it('nhóm hết món: riêng ô đó báo hết + "Đổi mùa" đóng mâm và focus chip mùa', () => {
     state = { ...state, data: toItems((d) => d.groupKey !== 'canh') }
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     spinAndWait()
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('Hết món Canh mùa này rồi 😅')).toBeInTheDocument()
@@ -304,7 +315,7 @@ describe('SpinScreen', () => {
 
   it('ô hết món → Thêm món: đóng mâm, mở form điền sẵn nhóm + mùa đang chọn; đóng form thì focus nút Quay', async () => {
     state = { ...state, data: toItems((d) => d.groupKey !== 'canh') }
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     spinAndWait()
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Mâm cơm' })).getByRole('button', { name: 'Thêm món' }))
     const editor = screen.getByRole('dialog', { name: 'Thêm món' })
@@ -319,7 +330,7 @@ describe('SpinScreen', () => {
   })
 
   it('Sửa món từ chi tiết trên mâm: đóng mâm, mở form; xong mở lại mâm như cũ và hiện dữ liệu mới', () => {
-    const { rerender } = render(<SpinScreen />, { wrapper: MemoryRouter })
+    const { rerender } = render(<SpinScreen />, { wrapper: Providers })
     spinAndWait()
     const slot = useTrayStore.getState().slots[0]
     const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
@@ -342,7 +353,7 @@ describe('SpinScreen', () => {
   })
 
   it('Esc và "Để sau" đóng mâm', () => {
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     spinAndWait()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -353,13 +364,13 @@ describe('SpinScreen', () => {
 
   it('chưa tải xong món thì nút khoá', () => {
     state = { ...state, data: undefined, isPending: true }
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     expect(screen.getByRole('button', { name: 'Mở nồi!' })).toBeDisabled()
   })
 
   it('lỗi thì hiện lời nhắn thân thiện và nút Thử lại', () => {
     state = { ...state, data: undefined, error: new AppError('network'), isError: true }
-    render(<SpinScreen />, { wrapper: MemoryRouter })
+    render(<SpinScreen />, { wrapper: Providers })
     expect(screen.getByRole('alert')).toHaveTextContent('Mất mạng rồi, kiểm tra wifi rồi thử lại nhé.')
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
     expect(refetch).toHaveBeenCalledOnce()
@@ -369,7 +380,7 @@ describe('SpinScreen', () => {
     const nameOf = (id: string | null) => foodSet.seed.find((d) => d.seedKey === id)!.name
 
     it('🔒 bật/tắt giữ với nhãn Đang giữ / Không giữ; ô giữ thì 🎲 khoá', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const first = useTrayStore.getState().slots[0]
       const name = nameOf(first.itemId)
@@ -382,7 +393,7 @@ describe('SpinScreen', () => {
     })
 
     it('🎲 chỉ đổi ô đó, cùng nhóm, ra món khác, và đọc món mới', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const before = useTrayStore.getState().slots
       for (let i = 0; i < 10; i++) {
@@ -398,7 +409,7 @@ describe('SpinScreen', () => {
     })
 
     it('Đổi cả mâm: ô giữ nguyên, không đóng mâm', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const kept = useTrayStore.getState().slots[0]
       fireEvent.click(screen.getByRole('button', { name: `${nameOf(kept.itemId)}: Không giữ` }))
@@ -408,7 +419,7 @@ describe('SpinScreen', () => {
     })
 
     it('＋ Thêm món → chọn nhóm: thêm ô có ✕; ô mặc định không có ✕; bỏ được', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       expect(screen.queryByRole('button', { name: /^Bỏ ô/ })).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: '＋ Thêm món' }))
@@ -431,7 +442,7 @@ describe('SpinScreen', () => {
 
   describe('chi tiết món', () => {
     it('món biến mất khi đang xem chi tiết: về mâm, focus trong dialog, Esc đóng ngay', () => {
-      const { rerender } = render(<SpinScreen />, { wrapper: MemoryRouter })
+      const { rerender } = render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const slot = useTrayStore.getState().slots[0]
       const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
@@ -445,7 +456,7 @@ describe('SpinScreen', () => {
     })
 
     it('nút mở chi tiết vẫn đọc nhóm và độ hiếm', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const slot = useTrayStore.getState().slots[0]
       const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
@@ -457,7 +468,7 @@ describe('SpinScreen', () => {
     })
 
     it('chạm ô mở chi tiết trong cùng dialog; Về mâm quay lại đúng mâm và focus về ô', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const slot = useTrayStore.getState().slots[1]
       fireEvent.click(screen.getByRole('button', { name: `${foodSet.seed.find((d) => d.seedKey === slot.itemId)!.name}: Không giữ` }))
@@ -474,7 +485,7 @@ describe('SpinScreen', () => {
     })
 
     it('Esc ở chi tiết thì về mâm, Esc lần nữa thì đóng mâm', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const d = foodSet.seed.find((x) => x.seedKey === useTrayStore.getState().slots[0].itemId)!
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
@@ -489,7 +500,7 @@ describe('SpinScreen', () => {
 
   describe('chốt mâm', () => {
     it('Chốt mâm! gửi entries đúng thứ tự trên mâm, thành công thì đóng mâm và báo ngắn', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const slots = useTrayStore.getState().slots
       fireEvent.click(screen.getByRole('button', { name: 'Chốt mâm!' }))
@@ -512,7 +523,7 @@ describe('SpinScreen', () => {
     })
 
     it('đang chốt thì khoá mọi nút trên mâm và không đóng được', () => {
-      const { rerender } = render(<SpinScreen />, { wrapper: MemoryRouter })
+      const { rerender } = render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       commitState = { isPending: true, error: null }
       rerender(<SpinScreen />)
@@ -523,7 +534,7 @@ describe('SpinScreen', () => {
     })
 
     it('lỗi: giữ mâm, hiện lời nhắn; Thử lại dùng đúng ID cũ', () => {
-      const { rerender } = render(<SpinScreen />, { wrapper: MemoryRouter })
+      const { rerender } = render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       const before = useTrayStore.getState().slots
       fireEvent.click(screen.getByRole('button', { name: 'Chốt mâm!' }))
@@ -541,7 +552,7 @@ describe('SpinScreen', () => {
     })
 
     it('lỗi rồi đổi mâm: lời nhắn cũ ẩn, lần chốt sau là ID mới và xoá bản ghi của lần lỗi', () => {
-      const { rerender } = render(<SpinScreen />, { wrapper: MemoryRouter })
+      const { rerender } = render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       fireEvent.click(screen.getByRole('button', { name: 'Chốt mâm!' }))
       const [first, opts] = commitMutate.mock.calls[0]
@@ -560,7 +571,7 @@ describe('SpinScreen', () => {
 
     it('đang tải mâm gần đây thì chưa quay; tải lỗi thì báo và chưa quay', () => {
       recentState = { isPending: true, fetchStatus: 'fetching', error: null }
-      const { rerender } = render(<SpinScreen />, { wrapper: MemoryRouter })
+      const { rerender } = render(<SpinScreen />, { wrapper: Providers })
       expect(screen.getByRole('button', { name: 'Mở nồi!' })).toBeDisabled()
       recentState = { isPending: false, fetchStatus: 'idle', error: new AppError('network') }
       rerender(<SpinScreen />)
@@ -570,14 +581,14 @@ describe('SpinScreen', () => {
 
     it('mâm không có món nào thì không chốt được', () => {
       state = { ...state, data: [] }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       expect(screen.getByRole('button', { name: 'Chốt mâm!' })).toBeDisabled()
     })
 
     it('đã có mâm chốt thì không hiện gợi ý lần đầu', () => {
       hasDraws = true
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       expect(screen.queryByText('Mở thử đi cả nhà!')).toBeNull()
     })
 
@@ -586,7 +597,7 @@ describe('SpinScreen', () => {
       const man = foodSet.seed.filter((d) => d.groupKey === 'man').slice(0, 2)
       state = { ...state, data: toItems((d) => d.groupKey !== 'man' || man.includes(d)) }
       recent = [{ chosenAt: new Date().toISOString(), entries: [{ itemId: man[0].seedKey }] }]
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       for (let i = 0; i < 8; i++) {
         spinAndWait()
         const manSlot = useTrayStore.getState().slots.find((sl) => sl.groupKey === 'man')!
@@ -598,20 +609,20 @@ describe('SpinScreen', () => {
 
   describe('cài đặt', () => {
     it('nút bánh răng dẫn tới màn Cài đặt', () => {
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       expect(screen.getByRole('link', { name: 'Mở cài đặt' })).toHaveAttribute('href', '/cai-dat')
     })
 
     it('chưa tải xong cấu hình thì chưa quay', () => {
       setConfigMock.loaded = false
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       expect(screen.getByRole('button', { name: 'Mở nồi!' })).toBeDisabled()
     })
 
     it('tải cấu hình lỗi: báo lỗi, Thử lại tải lại cấu hình, chưa quay', () => {
       setConfigMock.loaded = false
       setConfigMock.failed = true
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       expect(screen.getByRole('alert')).toHaveTextContent('Mất mạng rồi')
       expect(screen.getByRole('button', { name: 'Mở nồi!' })).toBeDisabled()
       fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
@@ -623,7 +634,7 @@ describe('SpinScreen', () => {
       const man = foodSet.seed.filter((d) => d.groupKey === 'man').slice(0, 2)
       state = { ...state, data: toItems((d) => d.groupKey !== 'man' || man.includes(d)) }
       recent = [{ chosenAt: new Date().toISOString(), entries: [{ itemId: man[0].seedKey }] }]
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       const seen = new Set<string | null>()
       for (let i = 0; i < 40 && !seen.has(man[0].seedKey); i++) {
         spinAndWait()
@@ -641,7 +652,7 @@ describe('SpinScreen', () => {
     it('mâm có ⭐⭐⭐: nồi nhá hàng một lần rồi mới bật nắp; nút Quay khoá suốt; thẻ ⭐⭐⭐ chậm một nhịp, hiệu ứng riêng, mâm mở khoá khi hết hiệu ứng', () => {
       // Mặn chỉ còn món ⭐⭐⭐, Rau/Canh chỉ món ⭐
       state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
       act(() => vi.advanceTimersByTime(1600))
       expect(document.querySelector('.gacha-pot--teasing')).not.toBeNull()
@@ -679,7 +690,7 @@ describe('SpinScreen', () => {
 
     it('mâm có ⭐⭐ (không ⭐⭐⭐): không nhá hàng, nắp lóe xanh; mỗi thẻ vệt xanh', () => {
       state = { ...state, data: toItems((d) => d.rarity === 2) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
       act(() => vi.advanceTimersByTime(1600))
       expect(document.querySelector('.gacha-pot--teasing')).toBeNull()
@@ -697,7 +708,7 @@ describe('SpinScreen', () => {
 
     it('bỏ qua khi đang có hiệu ứng: dừng hết hiệu ứng, hiện cả mâm', () => {
       state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinToTray()
       act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
       expect(bursts()).toHaveLength(1)
@@ -708,7 +719,7 @@ describe('SpinScreen', () => {
 
     it('🎲: ô lật xong thì chạy hiệu ứng theo bậc món mới, focus giữ ở 🎲', () => {
       state = { ...state, data: toItems((d) => d.rarity === 2) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       act(() => vi.advanceTimersByTime(BURST_MS[2]))
       expect(bursts()).toHaveLength(0)
@@ -729,7 +740,7 @@ describe('SpinScreen', () => {
       const showResult = vi.spyOn(useTrayStore.getState(), 'showResult')
       useTrayStore.setState({ showResult })
       state = { ...state, data: legendMan() }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
       act(() => vi.advanceTimersByTime(1600))
       fireEvent.click(screen.getByRole('button', { name: 'Nồi đang sôi…' }))
@@ -747,7 +758,7 @@ describe('SpinScreen', () => {
 
     it('rời màn Quay khi đang nhá hàng: không mở mâm, không lỗi', () => {
       state = { ...state, data: legendMan() }
-      const { unmount } = render(<SpinScreen />, { wrapper: MemoryRouter })
+      const { unmount } = render(<SpinScreen />, { wrapper: Providers })
       fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
       act(() => vi.advanceTimersByTime(1600))
       unmount()
@@ -757,7 +768,7 @@ describe('SpinScreen', () => {
 
     it('hai món ⭐⭐⭐: mỗi thẻ hiệu ứng riêng, mâm khoá tới khi hiệu ứng cuối xong', () => {
       state = { ...state, data: toItems((d) => (d.groupKey === 'canh' ? d.rarity === 1 : d.rarity === 3)) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinToTray()
       expect(useTrayStore.getState().slots.map((sl) => sl.rarity)).toEqual([1, 3, 3])
       act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
@@ -775,7 +786,7 @@ describe('SpinScreen', () => {
       ['nút ẩn "Hiện cả mâm ngay"', () => fireEvent.click(screen.getByRole('button', { name: 'Hiện cả mâm ngay' }))],
     ])('bỏ qua bằng %s khi đang có hiệu ứng: dừng hết', (_label, skip) => {
       state = { ...state, data: legendMan() }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinToTray()
       act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
       expect(bursts()).toHaveLength(1)
@@ -791,7 +802,7 @@ describe('SpinScreen', () => {
         foodSet.seed.find((d) => d.groupKey === 'man' && d.rarity === 3)!,
       ]
       state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? man.includes(d) : d.rarity === 2)) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       act(() => vi.advanceTimersByTime(BURST_MS[3]))
       expect(bursts()).toHaveLength(0)
@@ -825,7 +836,7 @@ describe('SpinScreen', () => {
       }))
       try {
         state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 2)) }
-        render(<SpinScreen />, { wrapper: MemoryRouter })
+        render(<SpinScreen />, { wrapper: Providers })
         fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
         act(() => vi.advanceTimersByTime(310))
         expect(document.querySelector('.gacha-pot--teasing')).toBeNull()
@@ -851,7 +862,7 @@ describe('SpinScreen', () => {
 
     it('âm thanh tắt (mặc định): không mở khoá/tải âm thanh; mỗi thẻ bật thì rung theo bậc, không tiếng', () => {
       state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 2)) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinToTray()
       expect(fb.unlock).not.toHaveBeenCalled()
       expect(fb.preload).not.toHaveBeenCalled()
@@ -869,7 +880,7 @@ describe('SpinScreen', () => {
     it('âm thanh bật: chạm Mở nồi! thì mở khoá + tải sẵn; mỗi thẻ phát tiếng theo bậc', () => {
       window.localStorage.setItem('noi-than:sound', 'on')
       state = { ...state, data: toItems((d) => d.rarity === 1) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
       expect(fb.unlock).toHaveBeenCalledTimes(1)
       expect(fb.preload).toHaveBeenCalledTimes(1)
@@ -885,7 +896,7 @@ describe('SpinScreen', () => {
 
     it('bỏ qua giữa chừng: một phản hồi theo bậc cao nhất của các thẻ chưa bật (⭐⭐⭐ không bị nuốt); mở lại mâm cũ không phát', () => {
       state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinToTray()
       act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
       fireEvent.click(screen.getByTestId('reveal-skip'))
@@ -903,7 +914,7 @@ describe('SpinScreen', () => {
     it('âm thanh bật: 🎲 và Đổi cả mâm mở khoá âm thanh trong lần chạm; Đổi cả mâm phản hồi một lần theo bậc cao nhất', () => {
       window.localStorage.setItem('noi-than:sound', 'on')
       state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? true : d.rarity === 1)) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       act(() => vi.advanceTimersByTime(BURST_MS[3]))
       fb.unlock.mockClear()
@@ -931,7 +942,7 @@ describe('SpinScreen', () => {
       }))
       try {
         state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
-        render(<SpinScreen />, { wrapper: MemoryRouter })
+        render(<SpinScreen />, { wrapper: Providers })
         fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
         act(() => vi.advanceTimersByTime(310))
         expect(calls()).toEqual([[3, true]])
@@ -947,7 +958,7 @@ describe('SpinScreen', () => {
 
     it('🎲: phản hồi theo bậc món mới khi lật xong', () => {
       state = { ...state, data: toItems((d) => d.rarity === 2) }
-      render(<SpinScreen />, { wrapper: MemoryRouter })
+      render(<SpinScreen />, { wrapper: Providers })
       spinAndWait()
       fb.feedback.mockClear()
       const slot = useTrayStore.getState().slots[0]
@@ -966,7 +977,7 @@ describe('SpinScreen', () => {
       }))
       try {
         state = { ...state, data: toItems((d) => (d.groupKey === 'man' ? d.rarity === 3 : d.rarity === 1)) }
-        render(<SpinScreen />, { wrapper: MemoryRouter })
+        render(<SpinScreen />, { wrapper: Providers })
         fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
         act(() => vi.advanceTimersByTime(310))
         expect(calls()).toEqual([[3, false]])

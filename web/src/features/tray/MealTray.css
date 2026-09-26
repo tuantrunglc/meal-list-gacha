@@ -246,3 +246,32 @@
   font-weight: var(--text-label-weight);
   cursor: pointer;
 }
+
+.tray-dialog__commit {
+  font-size: 1.125rem;
+}
+
+.tray-dialog__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-danger);
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+}
+
+/* Bọc nội dung mâm: disabled khi đang chốt thì khoá mọi nút con */
+.tray-dialog__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

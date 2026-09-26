@@ -9,6 +9,28 @@ import { SpinScreen } from './SpinScreen'
 const refetch = vi.fn(async () => {})
 let state: ItemsResult
 
+type CommitOpts = { onError?: () => void }
+type CommitInput = { id: string; entries: unknown[]; replaceId?: string | null }
+const commitMutate = vi.fn<(input: CommitInput, opts?: CommitOpts) => void>()
+let commitState: { isPending: boolean; error: AppError | null } = { isPending: false, error: null }
+let onCommitted: (() => void) | undefined
+let recent: { chosenAt: string; entries: { itemId: string }[] }[] = []
+let recentState: { isPending: boolean; fetchStatus: string; error: AppError | null } = {
+  isPending: false,
+  fetchStatus: 'idle',
+  error: null,
+}
+let hasDraws = false
+
+vi.mock('../../data/draws', () => ({
+  useRecentDraws: () => ({ data: recentState.isPending || recentState.error ? undefined : recent, refetch: vi.fn(), ...recentState }),
+  useHasDraws: () => ({ data: hasDraws }),
+  useCommitTray: (_setKey: string, cb?: () => void) => {
+    onCommitted = cb
+    return { mutate: commitMutate, reset: vi.fn(), ...commitState }
+  },
+}))
+
 vi.mock('../../data/items', () => ({
   useItems: () => state,
   itemImageSources: () => [],
@@ -59,7 +81,13 @@ describe('SpinScreen', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
     vi.setSystemTime(new Date(2026, 8, 26, 17, 0))
     refetch.mockClear()
-    useTrayStore.setState({ ...initialTray, open: false, slots: [] })
+    useTrayStore.setState({ ...initialTray, open: false, slots: [], commitId: null })
+    commitMutate.mockReset()
+    commitState = { isPending: false, error: null }
+    recent = []
+    recentState = { isPending: false, fetchStatus: 'idle', error: null }
+    onCommitted = undefined
+    hasDraws = false
     state = { data: toItems(), error: null, isPending: false, isError: false, refetch }
   })
 
@@ -307,6 +335,115 @@ describe('SpinScreen', () => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
       fireEvent.keyDown(document, { key: 'Escape' })
       expect(screen.queryByRole('dialog')).toBeNull()
+    })
+  })
+
+  describe('chốt mâm', () => {
+    it('Chốt mâm! gửi entries đúng thứ tự trên mâm, thành công thì đóng mâm và báo ngắn', () => {
+      render(<SpinScreen />)
+      spinAndWait()
+      const slots = useTrayStore.getState().slots
+      fireEvent.click(screen.getByRole('button', { name: 'Chốt mâm!' }))
+      expect(commitMutate).toHaveBeenCalledOnce()
+      const [input] = commitMutate.mock.calls[0]
+      expect(input.id).toMatch(/^[a-z0-9]{15}$/)
+      expect(input.replaceId).toBeNull()
+      expect(input.entries).toEqual(
+        slots.map((sl, order) => {
+          const d = foodSet.seed.find((x) => x.seedKey === sl.itemId)!
+          return { itemId: sl.itemId, groupKey: sl.groupKey, name: d.name, rarity: d.rarity, order }
+        }),
+      )
+      act(() => onCommitted!())
+      act(() => vi.advanceTimersByTime(10))
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(useTrayStore.getState().slots).toEqual([])
+      expect(screen.getByRole('status')).toHaveTextContent('Chốt rồi!')
+      expect(document.activeElement).toBe(screen.getByRole('status'))
+    })
+
+    it('đang chốt thì khoá mọi nút trên mâm và không đóng được', () => {
+      const { rerender } = render(<SpinScreen />)
+      spinAndWait()
+      commitState = { isPending: true, error: null }
+      rerender(<SpinScreen />)
+      const dialog = screen.getByRole('dialog')
+      for (const b of within(dialog).getAllByRole('button')) expect(b).toBeDisabled()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('lỗi: giữ mâm, hiện lời nhắn; Thử lại dùng đúng ID cũ', () => {
+      const { rerender } = render(<SpinScreen />)
+      spinAndWait()
+      const before = useTrayStore.getState().slots
+      fireEvent.click(screen.getByRole('button', { name: 'Chốt mâm!' }))
+      const [first, opts] = commitMutate.mock.calls[0]
+      act(() => opts!.onError!())
+      commitState = { isPending: false, error: new AppError('network') }
+      rerender(<SpinScreen />)
+      expect(useTrayStore.getState().slots).toEqual(before)
+      const alert = within(screen.getByRole('dialog')).getByRole('alert')
+      expect(alert).toHaveTextContent('Mất mạng rồi')
+      fireEvent.click(within(alert).getByRole('button', { name: 'Thử lại' }))
+      const retry = commitMutate.mock.calls.at(-1)![0]
+      expect(retry.id).toBe(first.id)
+      expect(retry.replaceId).toBeNull()
+    })
+
+    it('lỗi rồi đổi mâm: lời nhắn cũ ẩn, lần chốt sau là ID mới và xoá bản ghi của lần lỗi', () => {
+      const { rerender } = render(<SpinScreen />)
+      spinAndWait()
+      fireEvent.click(screen.getByRole('button', { name: 'Chốt mâm!' }))
+      const [first, opts] = commitMutate.mock.calls[0]
+      act(() => opts!.onError!())
+      commitState = { isPending: false, error: new AppError('network') }
+      rerender(<SpinScreen />)
+      const cur = useTrayStore.getState().slots[0]
+      const d = foodSet.seed.find((x) => x.seedKey === cur.itemId)!
+      fireEvent.click(screen.getByRole('button', { name: `Đổi món này: ${d.name}` }))
+      expect(within(screen.getByRole('dialog')).queryByRole('alert')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Chốt mâm!' }))
+      const next = commitMutate.mock.calls.at(-1)![0]
+      expect(next.id).not.toBe(first.id)
+      expect(next.replaceId).toBe(first.id)
+    })
+
+    it('đang tải mâm gần đây thì chưa quay; tải lỗi thì báo và chưa quay', () => {
+      recentState = { isPending: true, fetchStatus: 'fetching', error: null }
+      const { rerender } = render(<SpinScreen />)
+      expect(screen.getByRole('button', { name: 'Mở nồi!' })).toBeDisabled()
+      recentState = { isPending: false, fetchStatus: 'idle', error: new AppError('network') }
+      rerender(<SpinScreen />)
+      expect(screen.getByRole('button', { name: 'Mở nồi!' })).toBeDisabled()
+      expect(screen.getByRole('alert')).toHaveTextContent('Mất mạng rồi')
+    })
+
+    it('mâm không có món nào thì không chốt được', () => {
+      state = { ...state, data: [] }
+      render(<SpinScreen />)
+      spinAndWait()
+      expect(screen.getByRole('button', { name: 'Chốt mâm!' })).toBeDisabled()
+    })
+
+    it('đã có mâm chốt thì không hiện gợi ý lần đầu', () => {
+      hasDraws = true
+      render(<SpinScreen />)
+      expect(screen.queryByText('Mở thử đi cả nhà!')).toBeNull()
+    })
+
+    it('món vừa chốt hôm nay không ra lại', () => {
+      // chỉ còn 2 món Mặn, một món vừa chốt → luôn ra món còn lại
+      const man = foodSet.seed.filter((d) => d.groupKey === 'man').slice(0, 2)
+      state = { ...state, data: toItems((d) => d.groupKey !== 'man' || man.includes(d)) }
+      recent = [{ chosenAt: new Date().toISOString(), entries: [{ itemId: man[0].seedKey }] }]
+      render(<SpinScreen />)
+      for (let i = 0; i < 8; i++) {
+        spinAndWait()
+        const manSlot = useTrayStore.getState().slots.find((sl) => sl.groupKey === 'man')!
+        expect(manSlot.itemId).toBe(man[1].seedKey)
+        fireEvent.click(screen.getByRole('button', { name: 'Để sau' }))
+      }
     })
   })
 })

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useHasDraws, useRecentDraws } from '../../data/draws'
 import { useItems, type Item } from '../../data/items'
 import { drawSlots, type EngineItem, type Slot } from '../../engine'
 import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
@@ -22,15 +23,16 @@ function toEngineItem(item: Item): EngineItem {
   return { id: item.id, groupKey: item.groupKey, rarity: item.rarity, tags: item.tags, deleted: item.deleted }
 }
 
-type Props = {
-  /** Đã có mâm nào được chốt chưa (Story 1.8 nối vào lịch sử). */
-  hasHistory?: boolean
-}
-
-export function SpinScreen({ hasHistory = false }: Props) {
+export function SpinScreen() {
   const set = getSet(DEFAULT_SET_KEY)
   // Lần đầu mở app: household chưa có món thì nạp món mặc định của Bộ
   const items = useItems(set)
+  // Chưa có set_configs (Story 3.3): dùng số ngày mặc định của Bộ
+  const cooldownDays = set.defaultCooldownDays
+  const recentDraws = useRecentDraws(set.setKey, cooldownDays)
+  const hasDraws = useHasDraws(set.setKey)
+  const [committedNote, setCommittedNote] = useState(false)
+  const statusRef = useRef<HTMLParagraphElement>(null)
   const [filters, setFilters] = useState(() => defaultFilters(set, new Date()))
   const [spinning, setSpinning] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -58,8 +60,8 @@ export function SpinScreen({ hasHistory = false }: Props) {
     drawSlots({
       set,
       items: engineItems,
-      recentDraws: [],
-      cooldownDays: set.defaultCooldownDays,
+      recentDraws: recentDraws.data ?? [],
+      cooldownDays,
       slots,
       filters,
       now: new Date(),
@@ -68,6 +70,7 @@ export function SpinScreen({ hasHistory = false }: Props) {
 
   function spin() {
     if (spinning || !items.data) return
+    setCommittedNote(false)
     const snapshot = itemsById
     // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
     const result = draw(set.slotTemplate.map((s, i) => ({ id: `slot-${i}`, groupKey: s.groupKey, itemId: null, keep: false })))
@@ -116,15 +119,23 @@ export function SpinScreen({ hasHistory = false }: Props) {
         <GachaPot boiling={spinning} />
       </div>
 
-      {items.error ? (
+      {items.error || recentDraws.error ? (
         <div className="spin-screen__error" role="alert">
-          <p className="form-error">{items.error.message}</p>
-          <button type="button" className="button-secondary" onClick={() => void items.refetch()}>
+          <p className="form-error">{(items.error ?? recentDraws.error)!.message}</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => void (items.error ? items.refetch() : recentDraws.refetch())}
+          >
             {copy.retry}
           </button>
         </div>
+      ) : committedNote ? (
+        <p className="spin-screen__hint spin-screen__done" role="status" tabIndex={-1} ref={statusRef}>
+          {copy.tray.committed}
+        </p>
       ) : (
-        !hasHistory && <p className="spin-screen__hint">{copy.spin.firstHint}</p>
+        hasDraws.data === false && <p className="spin-screen__hint">{copy.spin.firstHint}</p>
       )}
 
       <button
@@ -132,14 +143,26 @@ export function SpinScreen({ hasHistory = false }: Props) {
         type="button"
         className="spin-button"
         onClick={spin}
-        disabled={!items.data}
+        // Chờ cả danh sách món lẫn mâm gần đây, để luật tránh trùng luôn có hiệu lực
+        disabled={!items.data || (cooldownDays > 0 && !recentDraws.data)}
         aria-disabled={spinning || undefined}
         data-spinning={spinning || undefined}
       >
         {spinning ? copy.spin.spinning : copy.spin.button}
       </button>
 
-      <MealTray set={set} itemsById={itemsById} draw={draw} onChangeFilter={focusFilters} announcement={announcement} />
+      <MealTray
+        set={set}
+        itemsById={itemsById}
+        draw={draw}
+        onChangeFilter={focusFilters}
+        announcement={announcement}
+        onCommitted={() => {
+          setCommittedNote(true)
+          // Đưa focus vào phản hồi để trình đọc báo, và không rơi ra body
+          window.setTimeout(() => statusRef.current?.focus(), 0)
+        }}
+      />
     </div>
   )
 }

@@ -49,6 +49,9 @@ export const copy = {
     openDetail: (group: string, name: string, rarity: string) => `Xem công thức: ${group} ${name}, ${rarity}`,
     detailTitle: (name: string) => `Chi tiết món ${name}`,
     backToTray: '← Về mâm',
+    commit: 'Chốt mâm!',
+    committing: 'Đang chốt…',
+    committed: 'Chốt rồi! Mấy món này nồi giấu vài hôm nha 😋',
   },
   screens: {
     library: 'Sổ món của nhà',

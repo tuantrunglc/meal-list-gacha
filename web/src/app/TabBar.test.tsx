@@ -4,6 +4,12 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 
+vi.mock('../data/draws', () => ({
+  useRecentDraws: () => ({ data: [], isPending: false, fetchStatus: 'idle' }),
+  useHasDraws: () => ({ data: false }),
+  useCommitTray: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null }),
+}))
+
 vi.mock('../data/items', () => ({
   useItems: () => ({ isError: false, data: [] }),
 }))

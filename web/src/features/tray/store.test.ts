@@ -26,7 +26,7 @@ function open() {
 }
 
 describe('useTrayStore', () => {
-  beforeEach(() => useTrayStore.setState({ open: false, slots: [] }))
+  beforeEach(() => useTrayStore.setState({ open: false, slots: [], commitId: null }))
 
   it('showResult sắp ô theo revealOrder và mở mâm', () => {
     st().showResult({
@@ -138,5 +138,30 @@ describe('useTrayStore', () => {
     open()
     for (let i = 0; i < 3; i++) st().addSlot('b', drawWith(i))
     expect(st().slots.at(-1)).toMatchObject({ status: 'empty', itemId: null })
+  })
+
+  it('commitId: giữ nguyên khi thử lại, đổi khi mâm đổi; clear bỏ mâm', () => {
+    open()
+    const first = st().takeCommitId()
+    expect(first).toMatch(/^[a-z0-9]{15}$/)
+    expect(st().takeCommitId()).toBe(first)
+    st().toggleLock('x')
+    expect(st().takeCommitId()).toBe(first)
+    const changes: [string, () => void][] = [
+      ['rerollAll', () => st().rerollAll(drawWith(4))],
+      ['rerollOne', () => st().rerollOne('y', drawWith(5))],
+      ['addSlot', () => st().addSlot('a', drawWith(6))],
+      ['removeSlot', () => st().removeSlot(st().slots.at(-1)!.id)],
+      ['showResult', () => open()],
+    ]
+    let prev = first
+    for (const [name, change] of changes) {
+      change()
+      const next = st().takeCommitId()
+      expect(next, name).not.toBe(prev)
+      prev = next
+    }
+    st().clear()
+    expect(st()).toMatchObject({ open: false, slots: [], commitId: null })
   })
 })

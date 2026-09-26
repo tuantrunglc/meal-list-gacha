@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { newId } from '../../data/ids'
 import type { DrawResult, Rarity, Slot, SlotStatus } from '../../engine'
 
 export type TraySlot = {
@@ -26,6 +27,17 @@ type TrayState = {
   rerollAll: (draw: DrawFn) => void
   addSlot: (groupKey: string, draw: DrawFn) => void
   removeSlot: (id: string) => void
+  /**
+   * ID cho lần chốt mâm này: sinh một lần, giữ nguyên khi thử lại (AD-4),
+   * đổi khi món trên mâm đổi (lần chốt đó là một mâm khác).
+   */
+  commitId: string | null
+  takeCommitId: () => string
+  /** ID của lần chốt gần nhất bị lỗi (có thể đã tới server mà mất phản hồi). */
+  failedCommitId: string | null
+  markCommitFailed: (id: string) => void
+  /** Chốt xong: đóng và bỏ mâm. */
+  clear: () => void
 }
 
 let extraCounter = 0
@@ -55,13 +67,24 @@ function reroll(slots: TraySlot[], targets: ReadonlySet<string>, draw: DrawFn): 
 export const useTrayStore = create<TrayState>((set, get) => ({
   open: false,
   slots: [],
+  commitId: null,
+  failedCommitId: null,
+  markCommitFailed: (id) => set({ failedCommitId: id }),
+  takeCommitId: () => {
+    const existing = get().commitId
+    if (existing) return existing
+    const id = newId()
+    set({ commitId: id })
+    return id
+  },
+  clear: () => set({ open: false, slots: [], commitId: null, failedCommitId: null }),
   showResult: (result, removableIds = new Set()) => {
     const byId = new Map(result.slots.map((s) => [s.id, s]))
     const slots = result.revealOrder.flatMap((id) => {
       const s = byId.get(id)
       return s ? [{ ...s, locked: false, removable: removableIds.has(id) }] : []
     })
-    set({ open: true, slots })
+    set({ open: true, slots, commitId: null, failedCommitId: null })
   },
   close: () => set({ open: false }),
   toggleLock: (id) =>
@@ -72,17 +95,17 @@ export const useTrayStore = create<TrayState>((set, get) => ({
   rerollOne: (id, draw) => {
     const target = get().slots.find((s) => s.id === id)
     if (!target || target.locked) return
-    set({ slots: reroll(get().slots, new Set([id]), draw) })
+    set({ slots: reroll(get().slots, new Set([id]), draw), commitId: null })
   },
   rerollAll: (draw) => {
     const targets = new Set(get().slots.filter((s) => !s.locked).map((s) => s.id))
-    set({ slots: reroll(get().slots, targets, draw) })
+    set({ slots: reroll(get().slots, targets, draw), commitId: null })
   },
   addSlot: (groupKey, draw) => {
     if (get().slots.length >= MAX_SLOTS) return
     const id = `extra-${++extraCounter}`
     const added: TraySlot = { id, groupKey, itemId: null, rarity: null, status: 'empty', locked: false, removable: true }
-    set({ slots: reroll([...get().slots, added], new Set([id]), draw) })
+    set({ slots: reroll([...get().slots, added], new Set([id]), draw), commitId: null })
   },
-  removeSlot: (id) => set({ slots: get().slots.filter((s) => !(s.id === id && s.removable)) }),
+  removeSlot: (id) => set({ slots: get().slots.filter((s) => !(s.id === id && s.removable)), commitId: null }),
 }))

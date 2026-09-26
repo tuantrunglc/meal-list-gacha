@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCommitTray, type DrawEntry } from '../../data/draws'
 import { itemImageSources, type Item } from '../../data/items'
 import type { SetDefinition } from '../../sets/types'
 import { copy } from '../../ui/copy'
@@ -18,6 +19,17 @@ type Props = {
   onChangeFilter: () => void
   /** Câu đọc cho trình đọc màn hình khi mâm hiện (xem `trayAnnouncement`). */
   announcement: string
+  /** Chốt mâm thành công (mâm đã đóng và bỏ). */
+  onCommitted: () => void
+}
+
+/** Snapshot các ô có món theo thứ tự trên mâm (AD-4). */
+export function trayEntries(slots: readonly TraySlot[], itemsById: ReadonlyMap<string, Item>): DrawEntry[] {
+  return slots.flatMap((s) => {
+    const item = s.itemId ? itemsById.get(s.itemId) : undefined
+    if (!item || s.rarity === null) return []
+    return [{ itemId: item.id, groupKey: s.groupKey, name: item.name, rarity: s.rarity }]
+  }).map((e, order) => ({ ...e, order }))
 }
 
 type SlotView =
@@ -54,7 +66,7 @@ export function MealTray(props: Props) {
   return open ? <TrayDialog {...props} /> : null
 }
 
-function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text }: Props) {
+function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, onCommitted }: Props) {
   const slots = useTrayStore((s) => s.slots)
   const close = useTrayStore((s) => s.close)
   const toggleLock = useTrayStore((s) => s.toggleLock)
@@ -62,6 +74,36 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text }
   const rerollAll = useTrayStore((s) => s.rerollAll)
   const addSlot = useTrayStore((s) => s.addSlot)
   const removeSlot = useTrayStore((s) => s.removeSlot)
+  const takeCommitId = useTrayStore((s) => s.takeCommitId)
+  const commitId = useTrayStore((s) => s.commitId)
+  const failedCommitId = useTrayStore((s) => s.failedCommitId)
+  const markCommitFailed = useTrayStore((s) => s.markCommitFailed)
+  const clear = useTrayStore((s) => s.clear)
+  // Xử lý thành công ở cấp hook: vẫn chạy nếu mâm đã đóng khi request đang bay
+  const commit = useCommitTray(set.setKey, () => {
+    // Không trả focus về nút cũ: màn Quay tự đặt focus vào phản hồi
+    skipRestore.current = true
+    clear()
+    onCommitted()
+  })
+  const entries = trayEntries(slots, itemsById)
+  // Đang chốt thì khoá mọi thao tác trên mâm, để mâm lưu đúng là mâm đang thấy
+  const busy = commit.isPending
+  // Lỗi chỉ còn nghĩa khi mâm chưa đổi từ lần chốt lỗi đó
+  const showCommitError = !!commit.error && failedCommitId !== null && failedCommitId === commitId
+
+  function commitTray() {
+    if (busy || entries.length === 0) return
+    const id = takeCommitId()
+    // Thử lại khi mâm chưa đổi: cùng ID, trùng thì coi là thành công.
+    // Mâm đã đổi sau một lần lỗi: xoá bản ghi của lần đó (nếu nó đã tới server).
+    const replaceId = failedCommitId && failedCommitId !== id ? failedCommitId : null
+    commit.mutate({ id, entries, replaceId }, { onError: () => markCommitFailed(id) })
+  }
+
+  function safeClose() {
+    if (!busy) close()
+  }
   const [picking, setPicking] = useState(false)
   // Đang xem chi tiết món của ô nào (cùng một lớp modal với mâm)
   const [detailSlotId, setDetailSlotId] = useState<string | null>(null)
@@ -138,13 +180,17 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text }
   const detailView = detailSlotView?.kind === 'item' ? detailSlotView : undefined
   // Đang xem chi tiết chỉ khi món còn hiển thị được (món biến mất thì coi như đã về mâm)
   const inDetail = detailView !== undefined
+  const commitBusy = useRef(false)
+  useEffect(() => {
+    commitBusy.current = busy
+  }, [busy])
 
   // Esc: đang xem chi tiết thì về mâm, đang ở mâm thì đóng
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (inDetail) setDetailSlotId(null)
-      else close()
+      else if (!commitBusy.current) close()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -163,11 +209,12 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text }
 
   return (
     <div className="tray-overlay">
-      <div className="tray-overlay__dim" onClick={close} aria-hidden="true" />
+      <div className="tray-overlay__dim" onClick={safeClose} aria-hidden="true" />
       <div
         className="tray-dialog"
         role="dialog"
         aria-modal="true"
+        aria-busy={busy || undefined}
         aria-label={detailView ? copy.tray.detailTitle(detailView.item.name) : copy.tray.title}
         ref={dialogRef}
         tabIndex={-1}
@@ -182,161 +229,181 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text }
           </>
         ) : (
           <>
-            <p className="tray-dialog__say">{copy.tray.say}</p>
-            <ul className="meal-tray">
-              {slots.map((slot) => {
-                const g = group(slot.groupKey)
-                const v = viewSlot(slot, set, itemsById)
-                const removeButton = slot.removable && (
-                  <button
-                    type="button"
-                    className="slot-button"
-                    aria-label={copy.tray.remove(v.groupLabel, v.kind === 'item' ? v.item.name : null)}
-                    onClick={() => {
-                      removeSlot(slot.id)
-                      dialogRef.current?.focus()
-                      announce()
-                    }}
-                  >
-                    <span aria-hidden="true">✕</span>
-                  </button>
-                )
-                if (v.kind === 'empty') {
-                  return (
-                    <li key={slot.id} className="meal-slot meal-slot--empty">
-                      <div className="meal-slot__info">
-                        {g && <GroupTag label={g.label} color={g.color} />}
-                        <p className="meal-slot__empty">{set.messages.emptySlot(v.groupLabel)}</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="button-secondary"
-                        onClick={() => {
-                          skipRestore.current = true
-                          close()
-                          onChangeFilter()
-                        }}
-                      >
-                        {set.messages.changeFilter}
-                      </button>
-                      {removeButton}
-                    </li>
-                  )
-                }
-                if (v.kind === 'missing') {
-                  return (
-                    <li key={slot.id} className="meal-slot meal-slot--empty">
-                      <div className="meal-slot__info">{g && <GroupTag label={g.label} color={g.color} />}</div>
-                      {slot.locked && (
-                        <button
-                          type="button"
-                          className="slot-button slot-button--on"
-                          aria-pressed="true"
-                          aria-label={copy.tray.locked(v.groupLabel)}
-                          onClick={() => toggleLock(slot.id)}
-                        >
-                          <span aria-hidden="true">🔒</span>
-                        </button>
-                      )}
-                      {removeButton}
-                    </li>
-                  )
-                }
-                return (
-                  <li
-                    key={slot.id}
-                    className={`meal-slot${slot.locked ? ' meal-slot--locked' : ''}`}
-                    style={{ borderColor: rarityColor[v.rarity] }}
-                  >
+            <fieldset className="tray-dialog__body" disabled={busy}>
+              <p className="tray-dialog__say">{copy.tray.say}</p>
+              <ul className="meal-tray">
+                {slots.map((slot) => {
+                  const g = group(slot.groupKey)
+                  const v = viewSlot(slot, set, itemsById)
+                  const removeButton = slot.removable && (
                     <button
                       type="button"
-                      className="meal-slot__open"
-                      data-open-slot={slot.id}
-                      aria-label={copy.tray.openDetail(v.groupLabel, v.item.name, copy.rarity[v.rarity].label)}
-                      onClick={() => openDetail(slot.id)}
-                    >
-                      <DishImage className="meal-slot__thumb" sources={itemImageSources(v.item)} alt="" compact />
-                      <span className="meal-slot__info">
-                        {g && <GroupTag label={g.label} color={g.color} />}
-                        <span className="meal-slot__name">{v.item.name}</span>
-                        <RarityBadge rarity={v.rarity} />
-                      </span>
-                    </button>
-                    <div className="meal-slot__controls">
-                      <button
-                        type="button"
-                        className="slot-button"
-                        aria-label={copy.tray.reroll(v.item.name)}
-                        disabled={slot.locked}
-                        onClick={() => {
-                          rerollOne(slot.id, draw)
-                          announce(slot.id)
-                        }}
-                      >
-                        <span aria-hidden="true">🎲</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`slot-button${slot.locked ? ' slot-button--on' : ''}`}
-                        aria-pressed={slot.locked}
-                        aria-label={slot.locked ? copy.tray.locked(v.item.name) : copy.tray.unlocked(v.item.name)}
-                        onClick={() => toggleLock(slot.id)}
-                      >
-                        <span aria-hidden="true">{slot.locked ? '🔒' : '🔓'}</span>
-                      </button>
-                      {removeButton}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-            <div className="tray-dialog__actions">
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={() => {
-                  rerollAll(draw)
-                  announce()
-                }}
-              >
-                {copy.tray.rerollAll}
-              </button>
-              <button type="button" className="button-secondary" onClick={close}>
-                {copy.tray.close}
-              </button>
-            </div>
-            {picking ? (
-              <div className="tray-add" role="group" aria-labelledby="tray-add-label" ref={pickerRef}>
-                <p className="tray-add__label" id="tray-add-label">
-                  {copy.tray.addPick}
-                </p>
-                <div className="tray-add__options">
-                  {set.groups.map((g) => (
-                    <button
-                      key={g.key}
-                      type="button"
-                      className="button-secondary"
+                      className="slot-button"
+                      aria-label={copy.tray.remove(v.groupLabel, v.kind === 'item' ? v.item.name : null)}
                       onClick={() => {
-                        addSlot(g.key, draw)
-                        openPicker(false)
+                        removeSlot(slot.id)
+                        dialogRef.current?.focus()
                         announce()
                       }}
                     >
-                      {g.label}
+                      <span aria-hidden="true">✕</span>
                     </button>
-                  ))}
-                  <button type="button" className="tray-add__link" onClick={() => openPicker(false)}>
-                    {copy.tray.addCancel}
+                  )
+                  if (v.kind === 'empty') {
+                    return (
+                      <li key={slot.id} className="meal-slot meal-slot--empty">
+                        <div className="meal-slot__info">
+                          {g && <GroupTag label={g.label} color={g.color} />}
+                          <p className="meal-slot__empty">{set.messages.emptySlot(v.groupLabel)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="button-secondary"
+                          onClick={() => {
+                            skipRestore.current = true
+                            close()
+                            onChangeFilter()
+                          }}
+                        >
+                          {set.messages.changeFilter}
+                        </button>
+                        {removeButton}
+                      </li>
+                    )
+                  }
+                  if (v.kind === 'missing') {
+                    return (
+                      <li key={slot.id} className="meal-slot meal-slot--empty">
+                        <div className="meal-slot__info">{g && <GroupTag label={g.label} color={g.color} />}</div>
+                        {slot.locked && (
+                          <button
+                            type="button"
+                            className="slot-button slot-button--on"
+                            aria-pressed="true"
+                            aria-label={copy.tray.locked(v.groupLabel)}
+                            onClick={() => toggleLock(slot.id)}
+                          >
+                            <span aria-hidden="true">🔒</span>
+                          </button>
+                        )}
+                        {removeButton}
+                      </li>
+                    )
+                  }
+                  return (
+                    <li
+                      key={slot.id}
+                      className={`meal-slot${slot.locked ? ' meal-slot--locked' : ''}`}
+                      style={{ borderColor: rarityColor[v.rarity] }}
+                    >
+                      <button
+                        type="button"
+                        className="meal-slot__open"
+                        data-open-slot={slot.id}
+                        aria-label={copy.tray.openDetail(v.groupLabel, v.item.name, copy.rarity[v.rarity].label)}
+                        onClick={() => openDetail(slot.id)}
+                      >
+                        <DishImage className="meal-slot__thumb" sources={itemImageSources(v.item)} alt="" compact />
+                        <span className="meal-slot__info">
+                          {g && <GroupTag label={g.label} color={g.color} />}
+                          <span className="meal-slot__name">{v.item.name}</span>
+                          <RarityBadge rarity={v.rarity} />
+                        </span>
+                      </button>
+                      <div className="meal-slot__controls">
+                        <button
+                          type="button"
+                          className="slot-button"
+                          aria-label={copy.tray.reroll(v.item.name)}
+                          disabled={slot.locked}
+                          onClick={() => {
+                            rerollOne(slot.id, draw)
+                            announce(slot.id)
+                          }}
+                        >
+                          <span aria-hidden="true">🎲</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`slot-button${slot.locked ? ' slot-button--on' : ''}`}
+                          aria-pressed={slot.locked}
+                          aria-label={slot.locked ? copy.tray.locked(v.item.name) : copy.tray.unlocked(v.item.name)}
+                          onClick={() => toggleLock(slot.id)}
+                        >
+                          <span aria-hidden="true">{slot.locked ? '🔒' : '🔓'}</span>
+                        </button>
+                        {removeButton}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+              {showCommitError && commit.error && (
+                <div className="tray-dialog__error" role="alert">
+                  <p>{commit.error.message}</p>
+                  <button type="button" className="button-secondary" onClick={commitTray}>
+                    {copy.retry}
                   </button>
                 </div>
-              </div>
-            ) : (
-              slots.length < MAX_SLOTS && (
-                <button type="button" className="tray-add__link" ref={addButtonRef} onClick={() => openPicker(true)}>
-                  {copy.tray.add}
+              )}
+              <div className="tray-dialog__actions">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => {
+                    commit.reset()
+                    rerollAll(draw)
+                    announce()
+                  }}
+                >
+                  {copy.tray.rerollAll}
                 </button>
-              )
-            )}
+                <button
+                  type="button"
+                  className="button-primary tray-dialog__commit"
+                  onClick={commitTray}
+                  disabled={entries.length === 0}
+                  aria-disabled={commit.isPending || undefined}
+                >
+                  {commit.isPending ? copy.tray.committing : copy.tray.commit}
+                </button>
+              </div>
+              <button type="button" className="tray-add__link" onClick={safeClose}>
+                {copy.tray.close}
+              </button>
+              {picking ? (
+                <div className="tray-add" role="group" aria-labelledby="tray-add-label" ref={pickerRef}>
+                  <p className="tray-add__label" id="tray-add-label">
+                    {copy.tray.addPick}
+                  </p>
+                  <div className="tray-add__options">
+                    {set.groups.map((g) => (
+                      <button
+                        key={g.key}
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => {
+                          addSlot(g.key, draw)
+                          openPicker(false)
+                          announce()
+                        }}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                    <button type="button" className="tray-add__link" onClick={() => openPicker(false)}>
+                      {copy.tray.addCancel}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                slots.length < MAX_SLOTS && (
+                  <button type="button" className="tray-add__link" ref={addButtonRef} onClick={() => openPicker(true)}>
+                    {copy.tray.add}
+                  </button>
+                )
+              )}
+            </fieldset>
           </>
         )}
         <p className="visually-hidden" aria-live="polite">

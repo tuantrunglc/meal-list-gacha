@@ -43,11 +43,13 @@ jobs:
       - run: npm run build
       # e2e dùng Chrome có sẵn trên runner + PocketBase tải về .tools/
       - run: npm run test:e2e
-      - if: failure()
+      # luôn tải lên (kể cả khi test chập chờn qua ở lần chạy lại) để có trace mà soi
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results
           path: web/test-results
+          if-no-files-found: ignore
           retention-days: 7
 
   deploy:

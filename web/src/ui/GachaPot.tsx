@@ -1,9 +1,10 @@
 import './GachaPot.css'
 
-/** Nồi đất (220px). `boiling`: sôi sùng sục, nắp nảy. Chỉ để trang trí. */
-export function GachaPot({ boiling }: { boiling: boolean }) {
+/** Nồi đất (220px). `boiling`: sôi sùng sục, nắp nảy; `opening`: nắp bật tung khi mở nồi. Chỉ để trang trí. */
+export function GachaPot({ boiling, opening = false }: { boiling: boolean; opening?: boolean }) {
+  const state = boiling ? ' gacha-pot--boiling' : opening ? ' gacha-pot--opening' : ''
   return (
-    <svg className={`gacha-pot${boiling ? ' gacha-pot--boiling' : ''}`} viewBox="0 0 220 220" aria-hidden="true" focusable="false">
+    <svg className={`gacha-pot${state}`} viewBox="0 0 220 220" aria-hidden="true" focusable="false">
       <g className="gacha-pot__steam">
         <path d="M80 40 q-8 -12 0 -24" />
         <path d="M110 34 q-8 -12 0 -24" />

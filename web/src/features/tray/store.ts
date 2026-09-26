@@ -20,7 +20,11 @@ type TrayState = {
   open: boolean
   /** Theo thứ tự trên mâm (lúc mở = thứ tự bật thẻ của engine). */
   slots: TraySlot[]
-  showResult: (result: DrawResult, removableIds?: ReadonlySet<string>) => void
+  /** Đang bật thẻ lần lượt sau khi mở nồi (chỉ lần mở từ nồi; mở lại mâm cũ thì không). */
+  revealing: boolean
+  showResult: (result: DrawResult, removableIds?: ReadonlySet<string>, reveal?: boolean) => void
+  /** Bật xong hoặc người dùng bỏ qua: hiện đủ mâm. */
+  finishReveal: () => void
   close: () => void
   toggleLock: (id: string) => void
   rerollOne: (id: string, draw: DrawFn) => void
@@ -67,6 +71,8 @@ function reroll(slots: TraySlot[], targets: ReadonlySet<string>, draw: DrawFn): 
 export const useTrayStore = create<TrayState>((set, get) => ({
   open: false,
   slots: [],
+  revealing: false,
+  finishReveal: () => set({ revealing: false }),
   commitId: null,
   failedCommitId: null,
   markCommitFailed: (id) => set({ failedCommitId: id }),
@@ -77,16 +83,16 @@ export const useTrayStore = create<TrayState>((set, get) => ({
     set({ commitId: id })
     return id
   },
-  clear: () => set({ open: false, slots: [], commitId: null, failedCommitId: null }),
-  showResult: (result, removableIds = new Set()) => {
+  clear: () => set({ open: false, slots: [], revealing: false, commitId: null, failedCommitId: null }),
+  showResult: (result, removableIds = new Set(), reveal = false) => {
     const byId = new Map(result.slots.map((s) => [s.id, s]))
     const slots = result.revealOrder.flatMap((id) => {
       const s = byId.get(id)
       return s ? [{ ...s, locked: false, removable: removableIds.has(id) }] : []
     })
-    set({ open: true, slots, commitId: null, failedCommitId: null })
+    set({ open: true, slots, revealing: reveal && slots.length > 0, commitId: null, failedCommitId: null })
   },
-  close: () => set({ open: false }),
+  close: () => set({ open: false, revealing: false }),
   toggleLock: (id) =>
     set({
       // Ô trống không có gì để giữ

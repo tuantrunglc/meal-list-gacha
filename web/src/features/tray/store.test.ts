@@ -26,7 +26,7 @@ function open() {
 }
 
 describe('useTrayStore', () => {
-  beforeEach(() => useTrayStore.setState({ open: false, slots: [], commitId: null }))
+  beforeEach(() => useTrayStore.setState({ open: false, slots: [], commitId: null, revealing: false }))
 
   it('showResult sắp ô theo revealOrder và mở mâm', () => {
     st().showResult({
@@ -39,6 +39,25 @@ describe('useTrayStore', () => {
     expect(st().open).toBe(true)
     expect(st().slots.map((x) => x.id)).toEqual(['b', 'a'])
     expect(st().slots.every((x) => !x.locked && !x.removable)).toBe(true)
+  })
+
+  it('bật thẻ lần lượt chỉ khi mở từ nồi; xong/đóng/chốt thì hết', () => {
+    const result = drawWith(1)([{ id: 'x', groupKey: 'a', itemId: null, keep: false }])
+    st().showResult(result)
+    expect(st().revealing).toBe(false)
+    st().showResult(result, new Set(), true)
+    expect(st().revealing).toBe(true)
+    st().finishReveal()
+    expect(st().revealing).toBe(false)
+    st().showResult(result, new Set(), true)
+    st().close()
+    expect(st().revealing).toBe(false)
+    st().showResult(result, new Set(), true)
+    st().clear()
+    expect(st().revealing).toBe(false)
+    // mâm rỗng không có gì để bật
+    st().showResult({ slots: [], revealOrder: [] }, new Set(), true)
+    expect(st().revealing).toBe(false)
   })
 
   it('toggleLock bật/tắt; ô trống không giữ được', () => {

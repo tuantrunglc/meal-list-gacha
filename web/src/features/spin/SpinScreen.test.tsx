@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../data/errors'
 import type { Item, ItemsResult } from '../../data/items'
 import { foodSet } from '../../sets/food/definition'
+import { REVEAL_FIRST_MS, REVEAL_SETTLE_MS, REVEAL_STEP_MS } from '../tray/MealTray'
 import { useTrayStore } from '../tray/store'
-import { SpinScreen } from './SpinScreen'
+import { LID_LEAD_MS, SpinScreen } from './SpinScreen'
 
 const refetch = vi.fn(async () => {})
 let state: ItemsResult
@@ -66,9 +67,18 @@ function toItems(filter: (d: (typeof foodSet.seed)[number]) => boolean = () => t
   }))
 }
 
-function spinAndWait() {
+/** Nồi sôi xong, nắp bật tới đỉnh: mâm vừa mở (chưa bật thẻ nào). */
+function spinToTray() {
   fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
   act(() => vi.advanceTimersByTime(1600))
+  act(() => vi.advanceTimersByTime(LID_LEAD_MS))
+}
+
+function spinAndWait() {
+  spinToTray()
+  // thẻ bật lần lượt rồi mâm mở khoá
+  const n = useTrayStore.getState().slots.length
+  act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS + (n - 1) * REVEAL_STEP_MS + REVEAL_SETTLE_MS))
   // câu đọc được đặt sau khi mâm hiện
   act(() => vi.advanceTimersByTime(60))
 }
@@ -125,15 +135,82 @@ describe('SpinScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Nồi đang sôi…' }))
     fireEvent.click(screen.getByRole('button', { name: 'Nồi đang sôi…' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    act(() => vi.advanceTimersByTime(1100))
-    act(() => vi.advanceTimersByTime(60))
-
+    act(() => vi.advanceTimersByTime(1000))
+    // nắp bật trước, mâm mở khi nắp lên tới đỉnh
+    expect(document.querySelector('.gacha-pot--opening')).not.toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => vi.advanceTimersByTime(LID_LEAD_MS))
     expect(showResult).toHaveBeenCalledOnce()
     const dialog = screen.getByRole('dialog', { name: 'Mâm cơm' })
-    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+    const order = useTrayStore.getState().slots.map((sl) => sl.itemId)
+    const names = () => within(dialog).queryAllByRole('listitem').map((li) => li.querySelector('.meal-slot__name')?.textContent)
+    const nameOf = (id: string | null) => foodSet.seed.find((d) => d.seedKey === id)?.name
+
+    // thẻ bật lần lượt theo đúng thứ tự engine; lúc bật chưa đọc và mâm khoá
+    expect(names()).toEqual([])
+    act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+    expect(names()).toEqual(order.slice(0, 1).map(nameOf))
+    expect(within(dialog).getByRole('button', { name: 'Chốt mâm!' })).toBeDisabled()
+    act(() => vi.advanceTimersByTime(REVEAL_STEP_MS))
+    expect(names()).toEqual(order.slice(0, 2).map(nameOf))
+    act(() => vi.advanceTimersByTime(REVEAL_STEP_MS))
+    expect(names()).toEqual(order.map(nameOf))
+    act(() => vi.advanceTimersByTime(REVEAL_SETTLE_MS - 1))
+    expect(live()).toBe('')
+    act(() => vi.advanceTimersByTime(1))
+    act(() => vi.advanceTimersByTime(60))
+    expect(within(dialog).getByRole('button', { name: 'Chốt mâm!' })).toBeEnabled()
+    expect(dialog).toHaveFocus()
+    // nắp đã về chỗ
+    expect(document.querySelector('.gacha-pot--opening')).toBeNull()
     // câu đọc đầy đủ: nhóm, tên, bậc theo đúng thứ tự trên mâm
     expect(live()).toBe(expectedAnnouncement())
     expect(live()).not.toContain('undefined')
+  })
+
+  it('chạm khi đang bật thẻ: hiện cả mâm ngay, mở khoá, đọc mâm một lần', () => {
+    render(<SpinScreen />, { wrapper: MemoryRouter })
+    spinToTray()
+    act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+    const dialog = screen.getByRole('dialog', { name: 'Mâm cơm' })
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(1)
+    // chạm nền lúc đang bật: bỏ qua, không đóng mâm
+    fireEvent.click(screen.getByTestId('reveal-skip'))
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+    expect(screen.queryByRole('button', { name: 'Hiện cả mâm ngay' })).toBeNull()
+    expect(within(dialog).getByRole('button', { name: 'Chốt mâm!' })).toBeEnabled()
+    act(() => vi.advanceTimersByTime(60))
+    expect(live()).toBe(expectedAnnouncement())
+    // hết giờ của chuỗi cũ cũng không làm gì thêm
+    act(() => vi.advanceTimersByTime(3000))
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+  })
+
+  it('bàn phím: Enter trên mâm hoặc nút ẩn "Hiện cả mâm ngay" bỏ qua phần bật thẻ', () => {
+    render(<SpinScreen />, { wrapper: MemoryRouter })
+    spinToTray()
+    const dialog = screen.getByRole('dialog', { name: 'Mâm cơm' })
+    // nút bỏ qua nằm trong dialog (trình đọc thấy, Tab tới được)
+    expect(within(dialog).getByRole('button', { name: 'Hiện cả mâm ngay' })).toBeInTheDocument()
+    fireEvent.keyDown(dialog, { key: 'Enter' })
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+    expect(within(dialog).queryByRole('button', { name: 'Hiện cả mâm ngay' })).toBeNull()
+    // lần sau: bấm nút ẩn
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Để sau' }))
+    spinToTray()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Hiện cả mâm ngay' }))
+    expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(3)
+  })
+
+  it('Esc khi đang bật: đóng mâm; mở lại mâm cũ thì hiện đủ, không bật lại', () => {
+    render(<SpinScreen />, { wrapper: MemoryRouter })
+    spinToTray()
+    act(() => vi.advanceTimersByTime(REVEAL_FIRST_MS))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => useTrayStore.setState({ open: true }))
+    expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(3)
+    expect(screen.queryByRole('button', { name: 'Hiện cả mâm ngay' })).toBeNull()
   })
 
   it('giảm chuyển động: mâm hiện sau 300ms', () => {
@@ -148,7 +225,14 @@ describe('SpinScreen', () => {
       act(() => vi.advanceTimersByTime(250))
       expect(screen.queryByRole('dialog')).toBeNull()
       act(() => vi.advanceTimersByTime(60))
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      const dialog = screen.getByRole('dialog')
+      // không bật lần lượt, nắp không bật: cả mâm ngay, mở khoá, không có nút bỏ qua
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+      expect(within(dialog).getByRole('button', { name: 'Chốt mâm!' })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'Hiện cả mâm ngay' })).toBeNull()
+      expect(document.querySelector('.gacha-pot--opening')).toBeNull()
+      act(() => vi.advanceTimersByTime(60))
+      expect(live()).toBe(expectedAnnouncement())
     } finally {
       vi.unstubAllGlobals()
     }

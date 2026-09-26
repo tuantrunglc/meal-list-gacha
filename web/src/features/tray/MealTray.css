@@ -275,3 +275,16 @@
   padding: 0;
   border: 0;
 }
+
+/* Đang bật thẻ: một lớp trong suốt phủ cả màn nhận chạm để bỏ qua */
+.tray-reveal__skip {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+
+/* Chỗ của thẻ sắp bật */
+.meal-slot--pending {
+  visibility: hidden;
+}

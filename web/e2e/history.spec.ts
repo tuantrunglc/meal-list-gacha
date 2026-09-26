@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { API } from './env.ts'
-import { login } from './helpers.ts'
+import { login, trayReady } from './helpers.ts'
 
 const token = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('pocketbase_auth') ?? '{}').token as string)
 
@@ -10,6 +10,7 @@ test('chốt mâm → lịch sử có mâm mới nhất với đúng tên theo t
   await page.getByRole('button', { name: 'Mở nồi!' }).click()
   const tray = page.getByRole('dialog')
   await expect(tray).toBeVisible()
+  await trayReady(page)
   const names = await tray.locator('.meal-slot__name').allTextContents()
   await tray.getByRole('button', { name: 'Chốt mâm!' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Chốt rồi!' })).toBeVisible()

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { ADMIN, API } from './env.ts'
-import { login } from './helpers.ts'
+import { login, trayReady } from './helpers.ts'
 
 const token = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('pocketbase_auth') ?? '{}').token as string)
 
@@ -9,6 +9,7 @@ async function openTray(page: Page) {
   await page.getByRole('button', { name: 'Mở nồi!' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await trayReady(page)
   return dialog
 }
 
@@ -19,6 +20,8 @@ async function trayNames(page: Page) {
 type DrawRow = { id: string; entries: { itemId: string; name: string; order: number }[] }
 
 test('chốt mâm: đúng 1 draw, entries theo thứ tự mâm; món vừa chốt không ra lại; không sửa được draw', async ({ page, request }) => {
+  // mở mâm 7 lần, mỗi lần có nồi sôi + thẻ bật lần lượt
+  test.setTimeout(90_000)
   await login(page)
   const t = await token(page)
   const before = (await (await request.get(`${API}/collections/draws/records`, { headers: { Authorization: t } })).json()).totalItems as number

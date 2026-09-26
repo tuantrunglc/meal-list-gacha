@@ -17,6 +17,10 @@ import './SpinScreen.css'
 
 const SPIN_MS = 1500
 const SPIN_MS_REDUCED = 300
+// Khớp thời lượng `pot-lid-pop` trong GachaPot.css
+const POT_OPEN_MS = 600
+/** Mâm mở khi nắp lên tới đỉnh (~40% của POT_OPEN_MS). */
+export const LID_LEAD_MS = 250
 
 function defaultFilters(set: SetDefinition, now: Date): Record<string, string> {
   return Object.fromEntries(set.facets.map((f) => [f.key, f.defaultValue(now)]))
@@ -42,18 +46,21 @@ export function SpinScreen() {
   const statusRef = useRef<HTMLParagraphElement>(null)
   const [filters, setFilters] = useState(() => defaultFilters(set, new Date()))
   const [spinning, setSpinning] = useState(false)
+  const [potOpening, setPotOpening] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   const reducedMotion = useReducedMotion()
   const showResult = useTrayStore((s) => s.showResult)
   const facetRefs = useRef<(HTMLDivElement | null)[]>([])
   const spinButton = useRef<HTMLButtonElement>(null)
   const timer = useRef<number | undefined>(undefined)
+  const lidTimer = useRef<number | undefined>(undefined)
 
   const itemsById = useMemo(() => new Map((items.data ?? []).map((i) => [i.id, i])), [items.data])
 
   useEffect(
     () => () => {
       window.clearTimeout(timer.current)
+      window.clearTimeout(lidTimer.current)
       // Rời màn Quay thì đóng mâm; quay lại không tự bật mâm cũ
       useTrayStore.getState().close()
     },
@@ -86,9 +93,18 @@ export function SpinScreen() {
     timer.current = window.setTimeout(
       () => {
         setSpinning(false)
-        showResult(result, removable)
-        // Dùng đúng danh sách món đã quay, không phụ thuộc lần tải lại sau đó
-        setAnnouncement(trayAnnouncement(useTrayStore.getState().slots, set, snapshot))
+        const open = () => {
+          showResult(result, removable, !reducedMotion)
+          // Dùng đúng danh sách món đã quay, không phụ thuộc lần tải lại sau đó
+          setAnnouncement(trayAnnouncement(useTrayStore.getState().slots, set, snapshot))
+        }
+        // Giảm chuyển động: hiện cả mâm (fade), nắp không bật
+        if (reducedMotion) return open()
+        // Nắp bật tung trước, mâm mở khi nắp lên tới đỉnh, rồi thẻ bật lần lượt
+        setPotOpening(true)
+        window.clearTimeout(lidTimer.current)
+        lidTimer.current = window.setTimeout(() => setPotOpening(false), POT_OPEN_MS)
+        timer.current = window.setTimeout(open, LID_LEAD_MS)
       },
       reducedMotion ? SPIN_MS_REDUCED : SPIN_MS,
     )
@@ -126,7 +142,7 @@ export function SpinScreen() {
       ))}
 
       <div className="spin-screen__stage">
-        <GachaPot boiling={spinning} />
+        <GachaPot boiling={spinning} opening={potOpening} />
       </div>
 
       {items.error || recentDraws.error || (config.error && !config.data) ? (

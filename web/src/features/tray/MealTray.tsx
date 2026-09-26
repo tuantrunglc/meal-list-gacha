@@ -1,3 +1,4 @@
+import { motion } from 'motion/react'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useCommitTray, type DrawEntry } from '../../data/draws'
 import { useItemImages } from '../../data/files'
@@ -64,6 +65,19 @@ export function trayAnnouncement(slots: readonly TraySlot[], set: SetDefinition,
   )
 }
 
+/** Thẻ đầu bật sau khi mâm mở (khớp tray-in 0,3s), các thẻ sau cách nhau ~0,5s. */
+export const REVEAL_FIRST_MS = 300
+export const REVEAL_STEP_MS = 500
+/** Thẻ cuối bật xong thì chờ chút rồi mới mở khoá mâm. */
+export const REVEAL_SETTLE_MS = 600
+
+/** Thẻ bật từ nồi lên rồi rơi vào chỗ trên mâm. */
+const POP = {
+  initial: { opacity: 0, scale: 0.6, y: -48 },
+  animate: { opacity: 1, scale: 1, y: 0 },
+  transition: { type: 'spring', stiffness: 420, damping: 24, restDelta: 0.001 },
+} as const
+
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 export function MealTray(props: Props) {
@@ -74,6 +88,8 @@ export function MealTray(props: Props) {
 
 function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, onCommitted, onAddItem, onEditItem }: Props) {
   const slots = useTrayStore((s) => s.slots)
+  const revealing = useTrayStore((s) => s.revealing)
+  const finishReveal = useTrayStore((s) => s.finishReveal)
   const close = useTrayStore((s) => s.close)
   const toggleLock = useTrayStore((s) => s.toggleLock)
   const rerollOne = useTrayStore((s) => s.rerollOne)
@@ -164,13 +180,41 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     dialogRef.current?.focus()
-    // Vùng live đã có trong DOM trước khi đổi nội dung thì trình đọc mới đọc
-    const t = window.setTimeout(() => setAnnouncement(text), 50)
     return () => {
-      window.clearTimeout(t)
       if (!skipRestore.current) previous?.focus?.()
     }
-  }, [close, text])
+  }, [close])
+
+  // Đọc mâm một lần, khi đã bật đủ thẻ.
+  // Vùng live đã có trong DOM trước khi đổi nội dung thì trình đọc mới đọc.
+  useEffect(() => {
+    if (revealing) return
+    const t = window.setTimeout(() => setAnnouncement(text), 50)
+    return () => window.clearTimeout(t)
+  }, [text, revealing])
+
+  // Bật thẻ lần lượt: ô thứ n hiện sau REVEAL_FIRST_MS + (n−1)×REVEAL_STEP_MS
+  const [shown, setShown] = useState(0)
+  const slotCount = slots.length
+  useEffect(() => {
+    if (!revealing) return
+    let n = 0
+    let t: number
+    const tick = () => {
+      n += 1
+      setShown(n)
+      t = n >= slotCount ? window.setTimeout(finishReveal, REVEAL_SETTLE_MS) : window.setTimeout(tick, REVEAL_STEP_MS)
+    }
+    t = window.setTimeout(tick, REVEAL_FIRST_MS)
+    return () => window.clearTimeout(t)
+  }, [revealing, slotCount, finishReveal])
+
+  // Bật xong (hoặc bỏ qua): focus lại dialog (nút bỏ qua vừa biến mất)
+  const wasRevealing = useRef(revealing)
+  useEffect(() => {
+    if (wasRevealing.current && !revealing) dialogRef.current?.focus()
+    wasRevealing.current = revealing
+  }, [revealing])
 
   // Giữ focus trong dialog (aria-modal)
   function trapTab(e: KeyboardEvent) {
@@ -221,6 +265,9 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
     }
   }, [inDetail])
 
+  const visibleSlots = revealing ? slots.slice(0, shown) : slots
+  const pop = revealing ? POP : {}
+
   return (
     <div className="tray-overlay">
       <div className="tray-overlay__dim" onClick={safeClose} aria-hidden="true" />
@@ -232,8 +279,21 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
         aria-label={detailView ? copy.tray.detailTitle(detailView.item.name) : copy.tray.title}
         ref={dialogRef}
         tabIndex={-1}
-        onKeyDown={trapTab}
+        onKeyDown={(e) => {
+          // Đang bật thẻ: Enter/Space cũng hiện cả mâm ngay (bàn phím, trình đọc màn hình)
+          if (revealing && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            finishReveal()
+            return
+          }
+          trapTab(e)
+        }}
       >
+        {revealing && (
+          <button type="button" className="visually-hidden" onClick={finishReveal}>
+            {copy.tray.skipReveal}
+          </button>
+        )}
         {detailView ? (
           <>
             <button type="button" className="tray-dialog__back" onClick={backToTray}>
@@ -248,10 +308,10 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
           </>
         ) : (
           <>
-            <fieldset className="tray-dialog__body" disabled={busy}>
+            <fieldset className="tray-dialog__body" disabled={busy || revealing}>
               <p className="tray-dialog__say">{copy.tray.say}</p>
               <ul className="meal-tray">
-                {slots.map((slot) => {
+                {visibleSlots.map((slot) => {
                   const g = group(slot.groupKey)
                   const v = viewSlot(slot, set, itemsById)
                   const removeButton = slot.removable && (
@@ -270,7 +330,7 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                   )
                   if (v.kind === 'empty') {
                     return (
-                      <li key={slot.id} className="meal-slot meal-slot--empty">
+                      <motion.li {...pop} key={slot.id} className="meal-slot meal-slot--empty">
                         <div className="meal-slot__info">
                           {g && <GroupTag label={g.label} color={g.color} />}
                           <p className="meal-slot__empty">{set.messages.emptySlot(v.groupLabel)}</p>
@@ -292,12 +352,12 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                           </button>
                         )}
                         {removeButton}
-                      </li>
+                      </motion.li>
                     )
                   }
                   if (v.kind === 'missing') {
                     return (
-                      <li key={slot.id} className="meal-slot meal-slot--empty">
+                      <motion.li {...pop} key={slot.id} className="meal-slot meal-slot--empty">
                         <div className="meal-slot__info">{g && <GroupTag label={g.label} color={g.color} />}</div>
                         {slot.locked && (
                           <button
@@ -311,11 +371,12 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                           </button>
                         )}
                         {removeButton}
-                      </li>
+                      </motion.li>
                     )
                   }
                   return (
-                    <li
+                    <motion.li
+                      {...pop}
                       key={slot.id}
                       className={`meal-slot${slot.locked ? ' meal-slot--locked' : ''}`}
                       style={{ borderColor: rarityColor[v.rarity] }}
@@ -358,9 +419,12 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
                         </button>
                         {removeButton}
                       </div>
-                    </li>
+                    </motion.li>
                   )
                 })}
+                {/* Chỗ của các thẻ sắp bật: giữ chiều cao mâm, không đọc */}
+                {revealing &&
+                  slots.slice(shown).map((slot) => <li key={slot.id} className="meal-slot meal-slot--pending" aria-hidden="true" />)}
               </ul>
               {showCommitError && commit.error && (
                 <div className="tray-dialog__error" role="alert">
@@ -434,6 +498,11 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
           {announcement}
         </p>
       </div>
+      {revealing && (
+        // Chạm bất kỳ đâu (kể cả nền) khi đang bật thẻ: hiện cả mâm ngay.
+        // Bàn phím/trình đọc dùng nút cùng nhãn bên trong dialog.
+        <div className="tray-reveal__skip" aria-hidden="true" data-testid="reveal-skip" onClick={finishReveal} />
+      )}
     </div>
   )
 }

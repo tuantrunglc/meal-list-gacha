@@ -52,6 +52,7 @@ export const copy = {
     addCancel: 'Thôi',
     openDetail: (group: string, name: string, rarity: string) => `Xem công thức: ${group} ${name}, ${rarity}`,
     detailTitle: (name: string) => `Chi tiết món ${name}`,
+    skipReveal: 'Hiện cả mâm ngay',
     backToTray: '← Về mâm',
     commit: 'Chốt mâm!',
     committing: 'Đang chốt…',

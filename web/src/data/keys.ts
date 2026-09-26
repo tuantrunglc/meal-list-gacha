@@ -1,0 +1,5 @@
+// Query key tập trung (AD-5): mọi hook và mutation lấy key từ đây.
+export const queryKeys = {
+  all: ['noi-than'] as const,
+  household: () => [...queryKeys.all, 'household'] as const,
+}

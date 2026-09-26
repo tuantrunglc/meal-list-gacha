@@ -56,3 +56,89 @@ button {
   font-weight: var(--text-title-weight);
   line-height: var(--text-title-line);
 }
+
+/* Ô nhập (`input`): 48px, bo `sm` */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field__label {
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-line);
+}
+
+.input {
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  border: 1.5px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-primary);
+  font: inherit;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-accent-tile);
+  outline-offset: 1px;
+}
+
+/* Nút hành động chính: viên thuốc màu primary. Mỗi màn chỉ một nút này. */
+.button-primary {
+  min-height: 48px;
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--text-title-family);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  line-height: var(--text-title-line);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+}
+
+.button-primary:active {
+  background: var(--color-primary-pressed);
+}
+
+.button-primary:disabled {
+  background: var(--color-ink-disabled);
+  box-shadow: none;
+  cursor: default;
+}
+
+.button-primary:focus-visible {
+  outline: 2px solid var(--color-accent-tile);
+  outline-offset: 2px;
+}
+
+/* Nút phụ (`button-secondary`) */
+.button-secondary {
+  min-height: 48px;
+  padding: var(--space-2) var(--space-5);
+  border: 1.5px solid var(--color-border-soft);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-primary);
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  cursor: pointer;
+}
+
+.button-secondary:focus-visible {
+  outline: 2px solid var(--color-accent-tile);
+  outline-offset: 2px;
+}
+
+.form-error {
+  color: var(--color-danger);
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+}

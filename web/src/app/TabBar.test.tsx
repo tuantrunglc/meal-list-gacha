@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+
+vi.mock('../data/auth', () => ({
+  useAuth: () => ({ isAuthenticated: true, userId: 'u1' }),
+  refreshSession: vi.fn(async () => {}),
+}))
 
 function renderAt(path: string) {
   return render(

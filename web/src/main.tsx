@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
@@ -15,9 +15,7 @@ import '@fontsource/be-vietnam-pro/vietnamese-600.css'
 import './ui/tokens.css'
 import './ui/global.css'
 import { App } from './app/App'
-
-// Online-only (AD-6): cache chỉ trong bộ nhớ, không persist.
-const queryClient = new QueryClient()
+import { queryClient } from './data/queryClient'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

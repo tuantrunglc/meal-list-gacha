@@ -12,6 +12,14 @@ export const copy = {
     2: { stars: '⭐⭐', label: 'Ngon' },
     3: { stars: '⭐⭐⭐', label: 'Đặc biệt' },
   },
+  login: {
+    title: 'Nồi Thần',
+    subtitle: 'Cả nhà đăng nhập một lần là nồi nhớ luôn.',
+    email: 'Email',
+    password: 'Mật khẩu',
+    submit: 'Vào bếp thôi!',
+    submitting: 'Đang mở cửa bếp…',
+  },
   screens: {
     spin: 'Mở nồi',
     library: 'Sổ món của nhà',

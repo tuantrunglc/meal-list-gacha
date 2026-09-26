@@ -7,7 +7,9 @@
 # Secrets cần đặt (Settings → Secrets and variables → Actions):
 #   VPS_HOST     IP hoặc domain VPS
 #   VPS_USER     user SSH (vd root)
-#   VPS_SSH_KEY  private key riêng cho CI (public key nằm trong ~/.ssh/authorized_keys của VPS)
+#   VPS_SSH_KEY      private key riêng cho CI; public key nằm trong authorized_keys của VPS
+#                    kèm command="/opt/noi-than/deploy/ci-receive.sh" (xem script đó)
+#   VPS_KNOWN_HOSTS  dòng known_hosts của VPS (ssh-keyscan)
 # Trên VPS cần sẵn /opt/noi-than (git clone) và /opt/noi-than/deploy/.env.
 name: CI/CD
 
@@ -67,35 +69,20 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           docker build -f deploy/Dockerfile --build-arg APP_VERSION="$TAG" -t "noi-than:$TAG" .
 
-      - name: Cài SSH key
+      - name: Nạp khoá SSH
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ci
-          chmod 600 ~/.ssh/id_ci
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
 
-      - name: Chuyển image sang VPS
+      # Khoá này bị trói vào deploy/ci-receive.sh (forced command trong authorized_keys):
+      # nó chỉ nhận image rồi chạy lại app, hỏng thì tự quay về bản cũ.
+      - name: Chuyển image sang VPS và chạy
         run: |
           docker save "noi-than:$TAG" | gzip \
-            | ssh -i ~/.ssh/id_ci "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" 'gunzip | docker load'
+            | ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 \
+                "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "deploy $TAG $GITHUB_SHA"
 
-      - name: Chạy bản mới
-        run: |
-          ssh -i ~/.ssh/id_ci "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" TAG="$TAG" SHA="$GITHUB_SHA" 'sh -s' <<'EOF'
-          set -eu
-          cd /opt/noi-than
-          git fetch -q origin main
-          git checkout -q --detach "$SHA"
-          cd deploy
-          sed -i "s/^APP_VERSION=.*/APP_VERSION=$TAG/" .env
-          # image đã có sẵn nên compose không build lại
-          docker compose up -d --no-build app
-          for i in $(seq 1 30); do
-            s=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)")
-            [ "$s" = healthy ] && { echo "noi-than:$TAG healthy"; break; }
-            [ "$i" = 30 ] && { echo "container không healthy: $s" >&2; docker compose logs --tail 50 app; exit 1; }
-            sleep 2
-          done
-          # giữ 3 image gần nhất để còn quay lại bản cũ
-          docker images noi-than --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' | sort -r | tail -n +4 | cut -f2 | xargs -r docker rmi || true
-          EOF
+      - name: Kiểm tra trang thật
+        run: curl -fsS --retry 5 --retry-delay 3 "${{ vars.SITE_URL || 'https://noi-than.duckdns.org' }}/api/health"

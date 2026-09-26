@@ -47,9 +47,9 @@ development_status:
   1-9-deploy-website-nồi-thần-lên-vps: review
   epic-1-retrospective: optional
 
-  epic-2: backlog
-  2-1-thư-viện-món: backlog
-  2-2-thêm-món-mới-kèm-công-thức: backlog
+  epic-2: in-progress
+  2-1-thư-viện-món: review
+  2-2-thêm-món-mới-kèm-công-thức: in-progress
   2-3-ảnh-món: backlog
   2-4-sửa-món: backlog
   2-5-xoá-món: backlog

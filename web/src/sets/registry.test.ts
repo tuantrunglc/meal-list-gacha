@@ -14,6 +14,11 @@ describe('mọi Bộ trong registry hợp lệ', () => {
     describe(set.setKey, () => {
       const groupKeys = set.groups.map((g) => g.key)
 
+      it('key nhóm và key giá trị facet không trùng nhau (lọc theo tag không nhầm facet)', () => {
+        const keys = [...groupKeys, ...set.facets.flatMap((f) => f.values.map((v) => v.key))]
+        expect(new Set(keys).size).toBe(keys.length)
+      })
+
       it('trọng số độ hiếm dương', () => {
         for (const r of [1, 2, 3] as const) expect(set.rarityWeights[r]).toBeGreaterThan(0)
       })

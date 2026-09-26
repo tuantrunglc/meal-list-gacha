@@ -1,0 +1,44 @@
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--space-4) + env(safe-area-inset-top, 0px)) var(--space-margin-mobile)
+    calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+}
+
+.modal__dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(42 33 27 / 0.72);
+}
+
+.modal__dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max-width);
+  max-height: 100%;
+  overflow-y: auto;
+  animation: modal-in 0.25s ease-out;
+}
+
+.modal__dialog:focus {
+  outline: none;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal__dialog {
+    animation: none;
+  }
+}

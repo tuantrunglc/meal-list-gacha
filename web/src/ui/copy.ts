@@ -53,6 +53,19 @@ export const copy = {
     committing: 'Đang chốt…',
     committed: 'Chốt rồi! Mấy món này nồi giấu vài hôm nha 😋',
   },
+  library: {
+    search: 'Tìm món',
+    searchPlaceholder: 'Gõ tên món, không cần dấu',
+    groupFilter: 'Nhóm',
+    all: 'Tất cả',
+    notFound: 'Không thấy món này. Thêm mới luôn?',
+    noMatch: 'Chưa có món nào khớp bộ lọc này.',
+    clearFilters: 'Bỏ lọc',
+    loading: 'Đang mở sổ món…',
+    card: (name: string, group: string, rarity: string, facets: string) =>
+      [name, group, rarity, facets].filter(Boolean).join(', '),
+    detailClose: 'Đóng',
+  },
   screens: {
     library: 'Sổ món của nhà',
     history: 'Mâm đã chốt',

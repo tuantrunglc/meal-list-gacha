@@ -69,7 +69,8 @@
   font-weight: var(--text-title-weight);
 }
 
-.settings__save {
+.settings__save,
+.settings__action {
   align-self: flex-start;
 }
 

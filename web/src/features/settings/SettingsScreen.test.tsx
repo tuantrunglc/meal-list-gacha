@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../data/errors'
@@ -17,6 +17,17 @@ vi.mock('../../data/household', () => ({
   useCurrentHousehold: () => ({ data: householdError ? undefined : { id: 'h1' }, error: householdError, refetch: householdRefetch }),
 }))
 
+const restoreMutate = vi.fn()
+const restoreReset = vi.fn()
+let restoreState: { isPending: boolean; error: AppError | null; ready: boolean }
+let onRestored: (() => void) | undefined
+vi.mock('../../data/items', () => ({
+  useRestoreSeed: (_set: unknown, cb?: () => void) => {
+    onRestored = cb
+    return { mutate: restoreMutate, reset: restoreReset, ...restoreState }
+  },
+}))
+
 vi.mock('../../data/setConfig', () => ({
   useSetConfig: () => ({ ...config, refetch }),
   useSaveCooldown: () => ({ mutate, reset: vi.fn(), ...save }),
@@ -27,6 +38,9 @@ beforeEach(() => {
   save = { isPending: false, error: null, ready: true }
   mutate.mockReset()
   householdError = null
+  restoreState = { isPending: false, error: null, ready: true }
+  restoreMutate.mockReset()
+  restoreReset.mockReset()
 })
 afterEach(() => window.localStorage.clear())
 
@@ -152,5 +166,53 @@ describe('SettingsScreen', () => {
     fireEvent.click(sw)
     expect(sw).toHaveAttribute('aria-checked', 'true')
     expect(window.localStorage.getItem('noi-than:sound')).toBe('on')
+  })
+
+  describe('khôi phục món mặc định', () => {
+    const open = () => fireEvent.click(screen.getByRole('button', { name: 'Khôi phục món mặc định' }))
+
+    it('hỏi xác nhận; Thôi thì không gọi server', () => {
+      renderScreen()
+      open()
+      const dialog = screen.getByRole('alertdialog', { name: 'Khôi phục món mặc định?' })
+      expect(dialog).toHaveTextContent('món nhà tự thêm vẫn giữ nguyên.')
+      fireEvent.click(screen.getByRole('button', { name: 'Thôi' }))
+      expect(screen.queryByRole('alertdialog')).toBeNull()
+      expect(restoreMutate).not.toHaveBeenCalled()
+      // lỗi cũ không còn khi mở lại
+      expect(restoreReset).toHaveBeenCalled()
+    })
+
+    it('household chưa sẵn sàng thì chưa xác nhận được', () => {
+      restoreState = { ...restoreState, ready: false }
+      renderScreen()
+      open()
+      expect(screen.getByRole('button', { name: 'Khôi phục' })).toBeDisabled()
+    })
+
+    it('xác nhận thì khôi phục; xong đóng hộp và báo', () => {
+      const { rerender } = renderScreen()
+      open()
+      fireEvent.click(screen.getByRole('button', { name: 'Khôi phục' }))
+      expect(restoreMutate).toHaveBeenCalledTimes(1)
+      act(() => onRestored?.())
+      rerender(<SettingsScreen />)
+      expect(screen.queryByRole('alertdialog')).toBeNull()
+      expect(useToast.getState().message).toBe('Nồi đủ món gốc rồi nè!')
+    })
+
+    it('đang chạy thì khoá; lỗi thì hiện lời nhắn và Thử lại', () => {
+      const { rerender } = renderScreen()
+      open()
+      restoreState = { ...restoreState, isPending: true }
+      rerender(<SettingsScreen />)
+      expect(screen.getByRole('button', { name: 'Đang khôi phục…' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Thôi' })).toBeDisabled()
+      restoreState = { ...restoreState, isPending: false, error: new AppError('network') }
+      rerender(<SettingsScreen />)
+      expect(within(screen.getByRole('alertdialog')).getByRole('alert')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
+      expect(restoreMutate).toHaveBeenCalledTimes(1)
+    })
   })
 })

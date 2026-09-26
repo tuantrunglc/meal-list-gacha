@@ -4,7 +4,7 @@ import { ClientResponseError } from 'pocketbase'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCurrentHousehold } from './household'
-import { itemImageSources, seedSet, useCreateItem, useDeleteItem, useItems, useUpdateItem, type Item, type SeedSource } from './items'
+import { itemImageSources, seedSet, useCreateItem, useDeleteItem, useItems, useRestoreSeed, useUpdateItem, type Item, type SeedSource } from './items'
 import { pb } from './pb'
 
 vi.mock('./auth', () => ({ useAuth: () => ({ isAuthenticated: true, userId: 'u1' }) }))
@@ -257,5 +257,143 @@ describe('useDeleteItem', () => {
     fake.update = vi.fn().mockRejectedValue(new ClientResponseError({ status: 0 }))
     const { result } = renderHook(() => useDeleteItem('set-a'), { wrapper })
     await expect(result.current.mutateAsync('i1')).rejects.toMatchObject({ code: 'network' })
+  })
+})
+
+describe('useRestoreSeed', () => {
+  const three: SeedSource = {
+    setKey: 'set-a',
+    seed: [
+      { seedKey: 's1', groupKey: 'g', name: 'Một', rarity: 1, tags: ['t'], attrs: { a: 1, b: [2] } },
+      { seedKey: 's2', groupKey: 'g', name: 'Hai', rarity: 2, tags: ['t'], attrs: {} },
+      { seedKey: 's3', groupKey: 'g', name: 'Ba', rarity: 3, tags: ['t'], attrs: {} },
+    ],
+  }
+  const intact = () => [
+    record('r1', { seedKey: 's1', name: 'Một', attrs: { a: 1, b: [2] } }),
+    record('r2', { seedKey: 's2', name: 'Hai', rarity: 2 }),
+    record('r3', { seedKey: 's3', name: 'Ba', rarity: 3 }),
+  ]
+
+  /** Server giả có trạng thái: update/create sửa danh sách mà getFullList trả. */
+  function server(records: ReturnType<typeof record>[]) {
+    const db = records.map((r) => ({ ...r }))
+    fake.getFullList.mockImplementation(async () => db.map((r) => ({ ...r })))
+    fake.update = vi.fn(async (id: string, body: Record<string, unknown>) => {
+      const r = db.find((x) => x.id === id)!
+      Object.assign(r, body, { image: body.image === null ? '' : r.image })
+      return r
+    })
+    fake.create.mockImplementation(async (body: Record<string, unknown>) => {
+      db.push(record(body.id as string, { ...body, image: '' }))
+      return body
+    })
+    return db
+  }
+
+  async function run(onRestored?: () => void) {
+    const { result } = renderHook(() => useRestoreSeed(three, onRestored), { wrapper })
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    await result.current.mutateAsync()
+    return result
+  }
+
+  it('món seed đã xoá / bị sửa / có ảnh thì về seed; nguyên vẹn thì không đụng; thiếu thì tạo; món tự thêm giữ nguyên', async () => {
+    server([
+      // nguyên vẹn (thứ tự khoá attrs khác vẫn coi là giống)
+      record('r1', { seedKey: 's1', name: 'Một', attrs: { b: [2], a: 1 } }),
+      // bị sửa tên, có ảnh upload, đã xoá
+      record('r2', { seedKey: 's2', name: 'Hai sửa', rarity: 2, image: 'x.webp', deleted: true }),
+      // món tự thêm
+      record('mine', { seedKey: '', name: 'Của nhà', deleted: true }),
+    ])
+    const onRestored = vi.fn()
+    await run(onRestored)
+    expect(fake.update).toHaveBeenCalledTimes(1)
+    expect(fake.update).toHaveBeenCalledWith('r2', {
+      groupKey: 'g',
+      name: 'Hai',
+      rarity: 2,
+      tags: ['t'],
+      attrs: {},
+      deleted: false,
+      image: null,
+    })
+    expect(fake.create).toHaveBeenCalledTimes(1)
+    expect(fake.create.mock.calls[0][0]).toMatchObject({ seedKey: 's3', name: 'Ba', household: 'h1', deleted: false })
+    expect(onRestored).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['ảnh upload', { image: 'up.webp' }],
+    ['công thức', { attrs: { a: 2, b: [2] } }],
+    ['độ hiếm', { rarity: 3 }],
+    ['nhóm', { groupKey: 'x' }],
+    ['tags', { tags: ['u'] }],
+    ['tên', { name: 'Khác' }],
+    ['đã xoá', { deleted: true }],
+  ])('chỉ khác %s cũng đưa về seed', async (_label, change) => {
+    const records = intact()
+    Object.assign(records[0], change)
+    server(records)
+    await run()
+    expect(fake.update).toHaveBeenCalledTimes(1)
+    expect(fake.update!.mock.calls[0][0]).toBe('r1')
+    expect(fake.create).not.toHaveBeenCalled()
+  })
+
+  it('seed không có công thức thì gửi attrs null (không bỏ khoá)', async () => {
+    const noAttrs: SeedSource = { setKey: 'set-a', seed: [{ seedKey: 's1', groupKey: 'g', name: 'Một', rarity: 1, tags: ['t'], attrs: undefined }] }
+    server([record('r1', { seedKey: 's1', name: 'Một', attrs: { x: 1 } })])
+    const { result } = renderHook(() => useRestoreSeed(noAttrs), { wrapper })
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    await result.current.mutateAsync()
+    expect(fake.update!.mock.calls[0][1]).toHaveProperty('attrs', null)
+  })
+
+  it('tạo trùng seedKey (máy khác vừa tạo rồi xoá): lượt hai đưa bản đó về seed', async () => {
+    const db = server(intact().slice(0, 2))
+    fake.create.mockImplementationOnce(async () => {
+      // máy khác tạo s3 đã bị sửa/xoá trước khi ta kịp tạo
+      db.push(record('other', { seedKey: 's3', name: 'Ba hỏng', rarity: 3, deleted: true }))
+      throw conflict()
+    })
+    await run()
+    expect(fake.update).toHaveBeenCalledWith('other', expect.objectContaining({ name: 'Ba', deleted: false }))
+  })
+
+  it('một món lỗi: không bắt đầu món mới, chờ món đang chạy xong rồi báo AppError; thử lại chạy nốt', async () => {
+    const extra: SeedSource = {
+      setKey: 'set-a',
+      seed: Array.from({ length: 20 }, (_, i) => ({ seedKey: `k${i}`, groupKey: 'g', name: `M${i}`, rarity: 1 as const, tags: ['t'], attrs: {} })),
+    }
+    server(extra.seed.map((d, i) => record(`r${i}`, { seedKey: d.seedKey, name: d.name, deleted: true })))
+    let inFlight = 0
+    let finishedAfterFail = false
+    let failedAt = -1
+    const base = fake.update as unknown as (id: string, body: Record<string, unknown>) => Promise<unknown>
+    let calls = 0
+    fake.update = vi.fn(async (id: string, body: Record<string, unknown>) => {
+      const n = calls++
+      inFlight++
+      await new Promise((r) => setTimeout(r, n === 0 ? 1 : 10))
+      inFlight--
+      if (n === 0) {
+        failedAt = Date.now()
+        throw new ClientResponseError({ status: 0 })
+      }
+      if (failedAt > 0) finishedAfterFail = true
+      return base(id, body)
+    })
+    const { result } = renderHook(() => useRestoreSeed(extra), { wrapper })
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    await expect(result.current.mutateAsync()).rejects.toMatchObject({ code: 'network' })
+    // lỗi chỉ ném ra khi không còn lệnh ghi nào dở
+    expect(inFlight).toBe(0)
+    expect(finishedAfterFail).toBe(true)
+    // không chạy hết 20 món sau khi lỗi
+    expect(calls).toBeLessThan(20)
+    await result.current.mutateAsync()
+    expect(fake.update).toHaveBeenCalledTimes(calls)
   })
 })

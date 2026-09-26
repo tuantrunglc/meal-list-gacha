@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useCurrentHousehold } from '../../data/household'
+import { useRestoreSeed } from '../../data/items'
 import { useSaveCooldown, useSetConfig } from '../../data/setConfig'
 import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
+import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { copy } from '../../ui/copy'
 import { useSoundEnabled } from '../../ui/preferences'
 import { showToast } from '../../ui/toast'
@@ -17,6 +19,11 @@ export function SettingsScreen() {
   const config = useSetConfig(set.setKey)
   const save = useSaveCooldown(set.setKey)
   const [sound, setSound] = useSoundEnabled()
+  const [restoring, setRestoring] = useState(false)
+  const restore = useRestoreSeed(set, () => {
+    setRestoring(false)
+    showToast(copy.settings.restored)
+  })
   const current = config.data ? (config.data.cooldownDays ?? set.defaultCooldownDays) : undefined
   // Giá trị đang chỉnh (null = chưa đụng, theo giá trị đã lưu)
   const [draft, setDraft] = useState<number | null>(null)
@@ -126,6 +133,33 @@ export function SettingsScreen() {
           </button>
         </div>
       </section>
+
+      <section className="settings__card" aria-labelledby="restore-label">
+        <h2 id="restore-label" className="settings__label">
+          {copy.settings.restoreLabel}
+        </h2>
+        <p className="settings__help">{copy.settings.restoreHelp}</p>
+        <button type="button" className="button-secondary settings__action" onClick={() => setRestoring(true)}>
+          {copy.settings.restoreButton}
+        </button>
+      </section>
+
+      {restoring && (
+        <ConfirmDialog
+          title={copy.settings.restoreTitle}
+          body={copy.settings.restoreBody}
+          confirmLabel={copy.settings.restoreConfirm}
+          busyLabel={copy.settings.restoring}
+          busy={restore.isPending}
+          confirmDisabled={!restore.ready}
+          error={restore.error?.message}
+          onCancel={() => {
+            restore.reset()
+            setRestoring(false)
+          }}
+          onConfirm={() => restore.mutate()}
+        />
+      )}
     </div>
   )
 }

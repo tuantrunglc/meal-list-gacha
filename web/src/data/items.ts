@@ -59,12 +59,24 @@ export type SeedSource = {
 
 const SEED_CONCURRENCY = 6
 
+/**
+ * Chạy song song có giới hạn. Một việc lỗi thì không bắt đầu việc mới, nhưng chờ các việc đang chạy
+ * xong rồi mới ném lỗi đầu tiên (để lần thử lại / tải lại không chồng lên lệnh ghi còn dở).
+ */
 async function mapLimit<T>(list: readonly T[], limit: number, fn: (x: T) => Promise<void>) {
   let next = 0
+  let failure: { err: unknown } | null = null
   const worker = async () => {
-    while (next < list.length) await fn(list[next++])
+    while (!failure && next < list.length) {
+      try {
+        await fn(list[next++])
+      } catch (err) {
+        failure ??= { err }
+      }
+    }
   }
   await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker))
+  if (failure) throw (failure as { err: unknown }).err
 }
 
 /**
@@ -78,10 +90,8 @@ export async function seedSet(
   existingSeedKeys: ReadonlySet<string> = new Set(),
 ) {
   const missing = seed.filter((d) => !existingSeedKeys.has(d.seedKey))
-  let failed = false
+  // Một món lỗi thì dừng các món còn lại (mapLimit), để lần thử lại không chồng lên
   await mapLimit(missing, SEED_CONCURRENCY, async (d) => {
-    // Một món lỗi thì dừng các món còn lại, để lần thử lại không chồng lên
-    if (failed) return
     for (let attempt = 0; ; attempt++) {
       try {
         await pb.collection('items').create({
@@ -100,7 +110,6 @@ export async function seedSet(
       } catch (err) {
         if (isConflict(err, 'seedKey')) return
         if (isConflict(err, 'id') && attempt < 2) continue
-        failed = true
         throw err
       }
     }
@@ -290,6 +299,77 @@ export function useDeleteItem(setKey: string) {
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.items(householdId ?? '', setKey) }),
+  })
+  return Object.assign(mutation, { ready: !!householdId })
+}
+
+/** JSON với khoá object đã sắp xếp, để so nội dung không phụ thuộc thứ tự khoá. */
+function stableJson(v: unknown): string {
+  return JSON.stringify(v, (_k, val: unknown) =>
+    val && typeof val === 'object' && !Array.isArray(val)
+      ? Object.fromEntries(Object.entries(val as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : val,
+  )
+}
+
+type SeedDish = SeedSource['seed'][number]
+
+function matchesSeed(item: Item, d: SeedDish): boolean {
+  return (
+    !item.deleted &&
+    !item.imageFile &&
+    item.name === d.name &&
+    item.groupKey === d.groupKey &&
+    item.rarity === d.rarity &&
+    stableJson(item.tags) === stableJson(d.tags) &&
+    stableJson(item.attrs ?? null) === stableJson(d.attrs ?? null)
+  )
+}
+
+/**
+ * Khôi phục món mặc định (AD-8): mọi món seed của Bộ về đúng nội dung seed, `deleted=false`, bỏ ảnh upload.
+ * Món tự thêm (`seedKey` rỗng) không bị đụng. Idempotent: thử lại là chạy lại từ đầu.
+ */
+export function useRestoreSeed(set: SeedSource, onRestored?: () => void) {
+  const { setKey } = set
+  const household = useCurrentHousehold()
+  const queryClient = useQueryClient()
+  const householdId = household.data?.id
+  const mutation = useMutation<void, AppError, void>({
+    mutationFn: async () => {
+      if (!householdId) throw new AppError('no-household')
+      try {
+        // Món seed đã có bản ghi: đưa về seed; chưa có thì tạo. Tạo mà trùng seedKey (máy khác vừa tạo,
+        // có thể đã sửa/xoá) thì lượt thứ hai đưa bản đó về seed.
+        for (let pass = 0; pass < 2; pass++) {
+          const all = await fetchAll(householdId, setKey)
+          const bySeedKey = new Map(all.filter((i) => i.seedKey).map((i) => [i.seedKey, i]))
+          const stale = set.seed.flatMap((d) => {
+            const item = bySeedKey.get(d.seedKey)
+            return item && !matchesSeed(item, d) ? [{ item, d }] : []
+          })
+          await mapLimit(stale, SEED_CONCURRENCY, async ({ item, d }) => {
+            await pb.collection('items').update(item.id, {
+              groupKey: d.groupKey,
+              name: d.name,
+              rarity: d.rarity,
+              tags: d.tags,
+              // seed không có công thức thì xoá công thức đã sửa (JSON bỏ khoá undefined)
+              attrs: d.attrs ?? null,
+              deleted: false,
+              image: null,
+            })
+          })
+          if (set.seed.every((d) => bySeedKey.has(d.seedKey))) break
+          await seedSet(householdId, set, new Set(bySeedKey.keys()))
+        }
+      } catch (err) {
+        throw toAppError(err)
+      }
+    },
+    // ở mức hook để vẫn báo khi màn đã rời đi
+    onSuccess: () => onRestored?.(),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.items(householdId ?? '', setKey) }),
   })
   return Object.assign(mutation, { ready: !!householdId })
 }

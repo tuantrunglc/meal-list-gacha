@@ -18,7 +18,9 @@ type ListProps = {
   disabled?: boolean
 }
 
-function LineList({ heading, items, numbered, lineLabel, addLabel, removeLabel, onChange, disabled }: ListProps) {
+function LineList({ heading, items: raw, numbered, lineLabel, addLabel, removeLabel, onChange, disabled }: ListProps) {
+  // Danh sách rỗng (món chưa có công thức) vẫn có một dòng để gõ
+  const items = raw.length > 0 ? raw : ['']
   const listRef = useRef<HTMLOListElement>(null)
   const Tag = numbered ? 'ol' : 'ul'
 

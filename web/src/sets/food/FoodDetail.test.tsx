@@ -22,4 +22,15 @@ describe('FoodDetail', () => {
     const bad = render(<FoodDetail attrs={'rác'} />)
     expect(bad.container.innerHTML).toBe('')
   })
+
+  it('chưa có nguyên liệu lẫn bước thì mời ghi công thức', () => {
+    render(<FoodDetail attrs={{ ingredients: [], steps: [] }} />)
+    expect(screen.getByText('Chưa có công thức, ghi lại bí kíp nè')).toBeInTheDocument()
+  })
+
+  it('chỉ có ghi chú: vẫn mời ghi công thức và hiện ghi chú', () => {
+    render(<FoodDetail attrs={{ ingredients: [], steps: [], note: 'mẹo' }} />)
+    expect(screen.getByText('Chưa có công thức, ghi lại bí kíp nè')).toBeInTheDocument()
+    expect(screen.getByText('mẹo')).toBeInTheDocument()
+  })
 })

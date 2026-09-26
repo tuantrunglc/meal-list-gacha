@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import type { Item } from '../../data/items'
 import { foodSet } from '../../sets/food/definition'
 import { ItemDetail } from './ItemDetail'
@@ -37,5 +37,14 @@ describe('ItemDetail', () => {
     render(<ItemDetail item={{ ...item, attrs: null }} set={foodSet} />)
     expect(screen.getByRole('heading', { name: 'Cá kho tộ' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Nguyên liệu' })).toBeNull()
+  })
+
+  it('nút Sửa chỉ có khi truyền onEdit, bấm thì gọi', () => {
+    const { rerender } = render(<ItemDetail item={item} set={foodSet} />)
+    expect(screen.queryByRole('button', { name: 'Sửa' })).toBeNull()
+    const onEdit = vi.fn()
+    rerender(<ItemDetail item={item} set={foodSet} onEdit={onEdit} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sửa' }))
+    expect(onEdit).toHaveBeenCalledOnce()
   })
 })

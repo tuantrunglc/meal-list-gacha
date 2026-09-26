@@ -47,3 +47,9 @@
   height: 10px;
   border-radius: 50%;
 }
+
+.item-detail__edit {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-top: var(--space-2);
+}

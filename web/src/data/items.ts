@@ -230,3 +230,40 @@ export function useCreateItem(setKey: string) {
   // Chưa biết household thì chưa lưu được (đang tải, không phải lỗi)
   return Object.assign(mutation, { ready: !!householdId })
 }
+
+export type UpdateItemInput = {
+  id: string
+  groupKey: string
+  name: string
+  rarity: Rarity
+  tags: string[]
+  /** undefined: giữ nguyên công thức đang lưu. */
+  attrs?: unknown
+  /** File: thay ảnh; null: bỏ ảnh; undefined: giữ nguyên. */
+  image?: File | null
+}
+
+/** Sửa món (không đổi Bộ, seedKey, household — rule cũng chặn). */
+export function useUpdateItem(setKey: string) {
+  const household = useCurrentHousehold()
+  const queryClient = useQueryClient()
+  const householdId = household.data?.id
+  const mutation = useMutation<void, AppError, UpdateItemInput>({
+    mutationFn: async ({ id, image, ...rest }) => {
+      try {
+        await pb.collection('items').update(id, {
+          groupKey: rest.groupKey,
+          name: rest.name.trim(),
+          rarity: rest.rarity,
+          tags: rest.tags,
+          ...(rest.attrs !== undefined ? { attrs: rest.attrs } : {}),
+          ...(image !== undefined ? { image } : {}),
+        })
+      } catch (err) {
+        throw toAppError(err)
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.items(householdId ?? '', setKey) }),
+  })
+  return Object.assign(mutation, { ready: !!householdId })
+}

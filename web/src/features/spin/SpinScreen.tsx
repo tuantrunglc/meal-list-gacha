@@ -34,6 +34,8 @@ export function SpinScreen() {
   const hasDraws = useHasDraws(set.setKey)
   const [committedNote, setCommittedNote] = useState(false)
   const [editor, setEditor] = useState<EditorPrefill | null>(null)
+  // Giữ bản món lúc bấm Sửa: danh sách có tải lại hay món biến mất thì form vẫn còn và luôn gọi onClose
+  const [editingItem, setEditingItem] = useState<Item | null>(null)
   const statusRef = useRef<HTMLParagraphElement>(null)
   const [filters, setFilters] = useState(() => defaultFilters(set, new Date()))
   const [spinning, setSpinning] = useState(false)
@@ -160,6 +162,7 @@ export function SpinScreen() {
         onChangeFilter={focusFilters}
         announcement={announcement}
         onAddItem={(groupKey) => setEditor({ groupKey, facets: filters })}
+        onEditItem={(id) => setEditingItem(items.data?.find((i) => i.id === id) ?? null)}
         onCommitted={() => {
           setCommittedNote(true)
           // Đưa focus vào phản hồi để trình đọc báo, và không rơi ra body
@@ -174,6 +177,18 @@ export function SpinScreen() {
             setEditor(null)
             // Nút mở form nằm trong mâm đã đóng: đưa focus về nút Quay
             requestAnimationFrame(() => spinButton.current?.focus())
+          }}
+        />
+      )}
+      {editingItem && (
+        <ItemEditor
+          set={set}
+          item={editingItem}
+          onClose={() => {
+            setEditingItem(null)
+            // Sửa xong quay lại đúng mâm (khoá, thứ tự giữ nguyên). Món có thể đã đổi:
+            // lần chốt sau là một mâm khác nên dùng ID mới (bản lỗi trước, nếu có, sẽ được thay).
+            useTrayStore.setState({ open: true, commitId: null })
           }}
         />
       )}

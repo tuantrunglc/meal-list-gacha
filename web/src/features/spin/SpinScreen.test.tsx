@@ -35,6 +35,7 @@ vi.mock('../../data/items', () => ({
   useItems: () => state,
   itemImageSources: () => [],
   useCreateItem: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
+  useUpdateItem: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
 }))
 
 function toItems(filter: (d: (typeof foodSet.seed)[number]) => boolean = () => true): Item[] {
@@ -207,6 +208,29 @@ describe('SpinScreen', () => {
     vi.useRealTimers()
     await new Promise((r) => requestAnimationFrame(r))
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Mở nồi!' }))
+  })
+
+  it('Sửa món từ chi tiết trên mâm: đóng mâm, mở form; xong mở lại mâm như cũ và hiện dữ liệu mới', () => {
+    const { rerender } = render(<SpinScreen />)
+    spinAndWait()
+    const slot = useTrayStore.getState().slots[0]
+    const d = foodSet.seed.find((x) => x.seedKey === slot.itemId)!
+    fireEvent.click(screen.getByRole('button', { name: `${d.name}: Không giữ` }))
+    const before = useTrayStore.getState().slots
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Xem công thức: .*${d.name}`) }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sửa' }))
+    expect(screen.getByRole('dialog', { name: 'Sửa món' })).toBeInTheDocument()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    // món được sửa (tên + độ hiếm) trong lúc form mở
+    const newRarity = d.rarity === 3 ? 1 : 3
+    state = { ...state, data: state.data!.map((i) => (i.id === d.seedKey ? { ...i, name: 'Tên mới', rarity: newRarity } : i)) }
+    rerender(<SpinScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Thôi' }))
+    const tray = screen.getByRole('dialog', { name: 'Mâm cơm' })
+    expect(useTrayStore.getState().slots).toEqual(before)
+    expect(within(tray).getByText('Tên mới')).toBeInTheDocument()
+    const label = { 1: 'Thường', 2: 'Ngon', 3: 'Đặc biệt' }[newRarity]
+    expect(within(tray).getByRole('button', { name: new RegExp(`Tên mới, ${label}$`) })).toBeInTheDocument()
   })
 
   it('Esc và "Để sau" đóng mâm', () => {

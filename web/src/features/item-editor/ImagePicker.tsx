@@ -9,8 +9,10 @@ export type PickedImage = ProcessedImage | null
 type Props = {
   /** Ảnh mới đã chọn (null = chưa chọn / đã bỏ). */
   value: PickedImage
-  /** Ảnh đang có của món (khi sửa); dùng khi chưa chọn ảnh mới. */
+  /** Nguồn hiển thị khi chưa chọn ảnh mới (ảnh đã upload → ảnh seed). */
   existingSources?: readonly string[]
+  /** Món đang có ảnh đã upload (bỏ được). Ảnh seed chỉ để hiển thị, không bỏ được. */
+  hasUploaded?: boolean
   onChange: (image: PickedImage) => void
   /** Bỏ ảnh đang có của món (khi sửa). */
   onRemoveExisting?: () => void
@@ -20,7 +22,15 @@ type Props = {
 }
 
 /** Ô ảnh món: xem trước 4:3, chọn Chụp ảnh / Chọn từ thư viện / Bỏ ảnh. */
-export function ImagePicker({ value, existingSources = [], onChange, onRemoveExisting, disabled, onBusyChange }: Props) {
+export function ImagePicker({
+  value,
+  existingSources = [],
+  hasUploaded = false,
+  onChange,
+  onRemoveExisting,
+  disabled,
+  onBusyChange,
+}: Props) {
   const [open, setOpen] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +43,7 @@ export function ImagePicker({ value, existingSources = [], onChange, onRemoveExi
       mounted.current = false
     }
   }, [])
-  const hasImage = value !== null || existingSources.length > 0
+  const hasImage = value !== null || hasUploaded
   const sources = value ? [value.previewUrl] : existingSources
 
   async function onFile(input: HTMLInputElement) {
@@ -62,9 +72,13 @@ export function ImagePicker({ value, existingSources = [], onChange, onRemoveExi
   }
 
   function remove() {
-    if (value) URL.revokeObjectURL(value.previewUrl)
-    onChange(null)
-    onRemoveExisting?.()
+    if (value) {
+      // Bỏ ảnh vừa chọn: quay về ảnh đang có (nếu có), không đụng ảnh đã upload
+      URL.revokeObjectURL(value.previewUrl)
+      onChange(null)
+    } else {
+      onRemoveExisting?.()
+    }
     setOpen(false)
     setError(null)
   }

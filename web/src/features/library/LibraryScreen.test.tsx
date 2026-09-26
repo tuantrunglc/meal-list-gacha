@@ -5,7 +5,12 @@ import { foodSet } from '../../sets/food/definition'
 import { LibraryScreen } from './LibraryScreen'
 
 let state: ItemsResult
-vi.mock('../../data/items', () => ({ useItems: () => state, itemImageSources: () => [] }))
+vi.mock('../../data/items', () => ({
+  useItems: () => state,
+  itemImageSources: () => [],
+  useCreateItem: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
+  useUpdateItem: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
+}))
 
 const items: Item[] = foodSet.seed.map((d) => ({
   id: d.seedKey,
@@ -95,5 +100,16 @@ describe('LibraryScreen', () => {
     render(<LibraryScreen />)
     expect(screen.getByRole('alert')).toHaveTextContent('Mất mạng rồi')
     expect(cards()).toHaveLength(items.length)
+  })
+
+  it('Sửa trong chi tiết: đóng chi tiết, mở form Sửa món (một modal); Thôi thì mở lại chi tiết', () => {
+    render(<LibraryScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /^Canh chua cá, Canh, Ngon/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sửa' }))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    const editor = screen.getByRole('dialog', { name: 'Sửa món' })
+    expect(within(editor).getByLabelText('Tên món')).toHaveValue('Canh chua cá')
+    fireEvent.click(within(editor).getByRole('button', { name: 'Thôi' }))
+    expect(screen.getByRole('dialog', { name: 'Chi tiết món Canh chua cá' })).toBeInTheDocument()
   })
 })

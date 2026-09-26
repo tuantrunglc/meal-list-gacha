@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { newId } from '../../data/ids'
-import { useCreateItem } from '../../data/items'
+import { useItemImages } from '../../data/files'
+import { useCreateItem, useUpdateItem, type Item } from '../../data/items'
 import type { Rarity } from '../../engine'
 import type { SetDefinition } from '../../sets/types'
 import { ChipGroup } from '../../ui/ChipGroup'
@@ -21,6 +22,8 @@ export type EditorPrefill = {
 type Props = {
   set: SetDefinition
   prefill?: EditorPrefill
+  /** Có thì là chế độ sửa món này. */
+  item?: Item
   onClose: () => void
 }
 
@@ -31,9 +34,36 @@ type FormState = {
   rarity: Rarity
   attrs: unknown
   image: PickedImage
+  /** Sửa món: bỏ ảnh đang có. */
+  removeExisting: boolean
 }
 
-function initialState(set: SetDefinition, prefill: EditorPrefill = {}): FormState {
+function fromItem(set: SetDefinition, item: Item): FormState {
+  const parsed = set.parseAttrs(item.attrs)
+  return {
+    name: item.name,
+    groupKey: set.groups.some((g) => g.key === item.groupKey) ? item.groupKey : null,
+    facets: Object.fromEntries(
+      set.facets.map((f) => {
+        const own = f.values.find((v) => item.tags.includes(v.key))?.key
+        return [f.key, own ?? f.universalValue ?? f.values[0]?.key ?? '']
+      }),
+    ),
+    rarity: item.rarity,
+    attrs: parsed.ok ? parsed.value : set.emptyAttrs(),
+    image: null,
+    removeExisting: false,
+  }
+}
+
+/** Tag của món không thuộc facet nào của Bộ: giữ nguyên khi lưu. */
+function extraTags(set: SetDefinition, tags: readonly string[]): string[] {
+  const known = new Set(set.facets.flatMap((f) => f.values.map((v) => v.key)))
+  return tags.filter((t) => !known.has(t))
+}
+
+function initialState(set: SetDefinition, prefill: EditorPrefill = {}, item?: Item): FormState {
+  if (item) return fromItem(set, item)
   return {
     name: prefill.name ?? '',
     groupKey: prefill.groupKey && set.groups.some((g) => g.key === prefill.groupKey) ? prefill.groupKey : null,
@@ -47,6 +77,7 @@ function initialState(set: SetDefinition, prefill: EditorPrefill = {}): FormStat
     rarity: 1,
     attrs: set.emptyAttrs(),
     image: null,
+    removeExisting: false,
   }
 }
 
@@ -57,20 +88,34 @@ const RARITY_OPTIONS = ([1, 2, 3] as const).map((r) => ({
 }))
 
 /** Form Thêm món trong một modal toàn màn hình (một lớp). */
-export function ItemEditor({ set, prefill, onClose }: Props) {
-  const [initial] = useState(() => initialState(set, prefill))
+export function ItemEditor({ set, prefill, item, onClose }: Props) {
+  const [initial] = useState(() => initialState(set, prefill, item))
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState<{ name?: string; group?: string }>({})
   const [confirming, setConfirming] = useState(false)
   const [imageBusy, setImageBusy] = useState(false)
   // ID sinh một lần: thử lại sau lỗi dùng lại đúng ID này
   const [id] = useState(newId)
-  const create = useCreateItem(set.setKey)
+  const createItem = useCreateItem(set.setKey)
+  const updateItem = useUpdateItem(set.setKey)
+  const imagesOf = useItemImages()
+  const editing = item !== undefined
+  // Một mặt hàng lưu chung cho cả hai chế độ
+  const create = editing ? updateItem : createItem
+  const title = editing ? copy.editor.editTitle : copy.editor.addTitle
+  // Bỏ ảnh đã upload thì hiển thị quay về ảnh seed (nếu có) hoặc đĩa trống
+  const existingSources = item ? imagesOf(form.removeExisting ? { ...item, imageFile: '' } : item, 'full') : []
+  const hasUploaded = !!item?.imageFile && !form.removeExisting
   const nameRef = useRef<HTMLInputElement>(null)
   const groupRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const AttrsEditor = set.AttrsEditor
-  const dirty = JSON.stringify({ ...form, image: form.image?.previewUrl ?? null }) !== JSON.stringify({ ...initial, image: null })
+  // So sánh sau khi chuẩn hoá công thức (dòng trống không tính là thay đổi)
+  const normalize = (f: FormState) => {
+    const parsed = set.parseAttrs(f.attrs)
+    return JSON.stringify({ ...f, attrs: parsed.ok ? parsed.value : f.attrs, image: f.image?.previewUrl ?? null })
+  }
+  const dirty = normalize(form) !== normalize(initial)
 
   // Bỏ URL xem trước khi đóng form
   const imageRef = useRef(form.image)
@@ -128,30 +173,45 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
     if (next.group) return groupRef.current?.querySelector<HTMLElement>('[role="radio"]')?.focus()
 
     const parsed = set.parseAttrs(form.attrs)
-    create.mutate(
-      {
-        id,
-        groupKey: form.groupKey!,
-        name: form.name,
-        rarity: form.rarity,
-        tags: Object.values(form.facets).filter(Boolean),
-        // Trình soạn của Bộ luôn cho ra attrs đúng dạng; nếu không thì lưu công thức rỗng đã chuẩn hoá
-        attrs: parsed.ok ? parsed.value : (set.parseAttrs(set.emptyAttrs()) as { value: unknown }).value,
-        image: form.image?.file ?? null,
+    const fields = {
+      groupKey: form.groupKey!,
+      name: form.name,
+      rarity: form.rarity,
+      tags: Object.values(form.facets).filter(Boolean),
+      // Trình soạn của Bộ luôn cho ra attrs đúng dạng; nếu không thì lưu công thức rỗng đã chuẩn hoá
+      attrs: parsed.ok ? parsed.value : (set.parseAttrs(set.emptyAttrs()) as { value: unknown }).value,
+    }
+    const done = {
+      onSuccess: () => {
+        showToast(copy.editor.saved)
+        onClose()
       },
-      {
-        onSuccess: () => {
-          showToast(copy.editor.saved)
-          onClose()
+    }
+    if (item) {
+      // ảnh mới: thay; đã bỏ: xoá; không đụng: giữ nguyên
+      const image = form.image ? form.image.file : form.removeExisting ? null : undefined
+      // Công thức đang lưu không đọc được mà người dùng không đụng tới: đừng ghi đè bằng công thức rỗng
+      const storedUnreadable = !set.parseAttrs(item.attrs).ok
+      const attrsUntouched = JSON.stringify(form.attrs) === JSON.stringify(initial.attrs)
+      updateItem.mutate(
+        {
+          ...fields,
+          tags: [...extraTags(set, item.tags), ...fields.tags],
+          attrs: storedUnreadable && attrsUntouched ? undefined : fields.attrs,
+          id: item.id,
+          image,
         },
-      },
-    )
+        done,
+      )
+    } else {
+      createItem.mutate({ ...fields, id, image: form.image?.file ?? null }, done)
+    }
   }
 
   const groupOptions = set.groups.map((g) => ({ key: g.key, label: g.label, color: g.color }))
 
   return (
-    <Modal label={copy.editor.addTitle} onClose={requestClose} locked={busy} initialFocusRef={titleRef}>
+    <Modal label={title} onClose={requestClose} locked={busy} initialFocusRef={titleRef}>
       <div className="item-editor">
         {confirming ? (
           <div className="item-editor__confirm" role="alertdialog" aria-labelledby="discard-title" aria-describedby="discard-body">
@@ -172,11 +232,14 @@ export function ItemEditor({ set, prefill, onClose }: Props) {
           <form onSubmit={onSubmit} noValidate>
             <fieldset className="item-editor__fields" disabled={create.isPending}>
               <h2 className="item-editor__title" tabIndex={-1} ref={titleRef}>
-                {copy.editor.addTitle}
+                {title}
               </h2>
 
               <ImagePicker
                 value={form.image}
+                existingSources={existingSources}
+                hasUploaded={hasUploaded}
+                onRemoveExisting={() => update({ removeExisting: true })}
                 onChange={(image) => update({ image })}
                 disabled={create.isPending}
                 onBusyChange={setImageBusy}

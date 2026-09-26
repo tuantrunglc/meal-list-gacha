@@ -24,14 +24,16 @@ type Props = {
   onCommitted: () => void
   /** Ô hết món: thêm món mới cho nhóm này (mâm đóng trước). */
   onAddItem?: (groupKey: string) => void
+  /** Sửa món từ chi tiết trên mâm (mâm đóng trước, mở lại sau). */
+  onEditItem?: (itemId: string) => void
 }
 
-/** Snapshot các ô có món theo thứ tự trên mâm (AD-4). */
+/** Snapshot các ô có món theo thứ tự trên mâm, dữ liệu món tại lúc chốt (AD-4). */
 export function trayEntries(slots: readonly TraySlot[], itemsById: ReadonlyMap<string, Item>): DrawEntry[] {
   return slots.flatMap((s) => {
-    const item = s.itemId ? itemsById.get(s.itemId) : undefined
-    if (!item || s.rarity === null) return []
-    return [{ itemId: item.id, groupKey: s.groupKey, name: item.name, rarity: s.rarity }]
+    const item = s.status !== 'empty' && s.itemId ? itemsById.get(s.itemId) : undefined
+    if (!item) return []
+    return [{ itemId: item.id, groupKey: s.groupKey, name: item.name, rarity: item.rarity }]
   }).map((e, order) => ({ ...e, order }))
 }
 
@@ -43,11 +45,12 @@ type SlotView =
 /** Một nguồn duy nhất cho cả phần hiển thị lẫn câu đọc. */
 function viewSlot(slot: TraySlot, set: SetDefinition, itemsById: ReadonlyMap<string, Item>): SlotView {
   const groupLabel = set.groups.find((g) => g.key === slot.groupKey)?.label ?? slot.groupKey
-  if (slot.status === 'empty' || slot.itemId === null || slot.rarity === null) return { kind: 'empty', groupLabel }
+  if (slot.status === 'empty' || slot.itemId === null) return { kind: 'empty', groupLabel }
   const item = itemsById.get(slot.itemId)
   // Món vừa bị xoá hoặc danh sách đang tải lại: không nói "hết món"
   if (!item) return { kind: 'missing', groupLabel }
-  return { kind: 'item', groupLabel, item, rarity: slot.rarity }
+  // Độ hiếm lấy từ món hiện tại (có thể vừa được sửa), không từ bản chụp lúc quay
+  return { kind: 'item', groupLabel, item, rarity: item.rarity }
 }
 
 /** Câu đọc cho trình đọc màn hình: "Mâm cơm: Mặn <tên>, <bậc>; Rau …". */
@@ -69,7 +72,7 @@ export function MealTray(props: Props) {
   return open ? <TrayDialog {...props} /> : null
 }
 
-function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, onCommitted, onAddItem }: Props) {
+function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, onCommitted, onAddItem, onEditItem }: Props) {
   const slots = useTrayStore((s) => s.slots)
   const close = useTrayStore((s) => s.close)
   const toggleLock = useTrayStore((s) => s.toggleLock)
@@ -236,7 +239,12 @@ function TrayDialog({ set, itemsById, draw, onChangeFilter, announcement: text, 
             <button type="button" className="tray-dialog__back" onClick={backToTray}>
               {copy.tray.backToTray}
             </button>
-            <ItemDetail item={detailView.item} set={set} ref={detailHeadingRef} />
+            <ItemDetail
+              item={detailView.item}
+              set={set}
+              ref={detailHeadingRef}
+              onEdit={onEditItem && (() => closeThen(() => onEditItem(detailView.item.id)))}
+            />
           </>
         ) : (
           <>

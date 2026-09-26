@@ -13,6 +13,7 @@ export function FoodDetail({ attrs }: { attrs: unknown }) {
   const note = parsed.value.note?.trim()
   return (
     <div className="food-detail">
+      {ingredients.length === 0 && steps.length === 0 && <p className="food-detail__empty">{foodCopy.noRecipe}</p>}
       {ingredients.length > 0 && (
         <section>
           <h3 className="food-detail__heading">{foodCopy.ingredients}</h3>

@@ -78,6 +78,8 @@ export const copy = {
   },
   editor: {
     addTitle: 'Thêm món',
+    editTitle: 'Sửa món',
+    editButton: 'Sửa',
     name: 'Tên món',
     namePlaceholder: 'Ví dụ: Thịt kho trứng kiểu mẹ',
     nameMissing: 'Món này tên gì nè?',

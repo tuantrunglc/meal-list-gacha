@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../data/errors'
+import type { Item } from '../../data/items'
 import { foodSet } from '../../sets/food/definition'
 import { useToast } from '../../ui/toast'
 import { ItemEditor } from './ItemEditor'
@@ -9,7 +10,12 @@ type Opts = { onSuccess?: () => void }
 const mutate = vi.fn<(input: Record<string, unknown>, opts?: Opts) => void>()
 const reset = vi.fn()
 let createState: { isPending: boolean; error: AppError | null; ready: boolean } = { isPending: false, error: null, ready: true }
-vi.mock('../../data/items', () => ({ useCreateItem: () => ({ mutate, reset, ...createState }) }))
+const updateMutate = vi.fn<(input: Record<string, unknown>, opts?: Opts) => void>()
+let updateState: { isPending: boolean; error: AppError | null; ready: boolean } = { isPending: false, error: null, ready: true }
+vi.mock('../../data/items', () => ({
+  useCreateItem: () => ({ mutate, reset, ...createState }),
+  useUpdateItem: () => ({ mutate: updateMutate, reset: vi.fn(), ...updateState }),
+}))
 
 const processImage = vi.fn()
 vi.mock('./imageProcessing', async (orig) => ({
@@ -23,6 +29,8 @@ const renderEditor = (prefill = {}) => render(<ItemEditor set={foodSet} prefill=
 describe('ItemEditor', () => {
   beforeEach(() => {
     mutate.mockReset()
+    updateMutate.mockReset()
+    updateState = { isPending: false, error: null, ready: true }
     onClose.mockReset()
     createState = { isPending: false, error: null, ready: true }
     useToast.setState({ message: null, id: 0 })
@@ -175,5 +183,129 @@ describe('ItemEditor', () => {
     expect(onClose).not.toHaveBeenCalled()
     await act(async () => resolve({ file: new File(['x'], 'm.webp'), previewUrl: 'blob:q', width: 1, height: 1 }))
     expect(screen.getByRole('button', { name: 'Lưu' })).toBeEnabled()
+  })
+
+  describe('chế độ sửa', () => {
+    const seed = foodSet.seed.find((d) => d.seedKey === 'ca-kho-to')!
+    const item: Item = {
+      id: 'i1',
+      household: 'h',
+      setKey: 'food',
+      groupKey: seed.groupKey,
+      name: seed.name,
+      rarity: seed.rarity,
+      tags: seed.tags,
+      attrs: seed.attrs,
+      seedKey: seed.seedKey,
+      deleted: false,
+      imageFile: 'cu.webp',
+      collectionId: 'c',
+      updated: '',
+    }
+
+    it('điền sẵn dữ liệu món, tiêu đề Sửa món; chưa đổi gì thì Thôi đóng luôn', () => {
+      render(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      expect(screen.getByRole('dialog', { name: 'Sửa món' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Tên món')).toHaveValue('Cá kho tộ')
+      expect(screen.getByRole('radio', { name: 'Mặn' })).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByRole('radio', { name: 'Quanh năm' })).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByRole('radio', { name: '⭐⭐⭐ Đặc biệt' })).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByLabelText('Nguyên liệu 1')).toHaveValue(seed.attrs.ingredients[0])
+      expect(document.querySelector('.image-picker__preview img')!.getAttribute('src')).toContain('cu.webp')
+      fireEvent.click(screen.getByRole('button', { name: 'Thôi' }))
+      expect(onClose).toHaveBeenCalledOnce()
+    })
+
+    it('chỉ sửa tên: gửi update không kèm ảnh (giữ ảnh)', () => {
+      render(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      fireEvent.change(screen.getByLabelText('Tên món'), { target: { value: 'Cá kho tộ của bà' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+      expect(mutate).not.toHaveBeenCalled()
+      const [input] = updateMutate.mock.calls[0]
+      expect(input).toMatchObject({ id: 'i1', name: 'Cá kho tộ của bà', groupKey: 'man', rarity: 3, tags: ['quanh-nam'] })
+      expect(input.image).toBeUndefined()
+      expect('seedKey' in input).toBe(false)
+    })
+
+    it('Bỏ ảnh rồi lưu: gửi image = null', () => {
+      render(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Đổi ảnh món' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Bỏ ảnh' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+      expect(updateMutate.mock.calls[0][0].image).toBeNull()
+    })
+
+    it('món seed chưa upload ảnh: ô ảnh là "Thêm ảnh món", không có "Bỏ ảnh"', () => {
+      render(<ItemEditor set={foodSet} item={{ ...item, imageFile: '' }} onClose={onClose} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Thêm ảnh món' }))
+      expect(screen.queryByRole('button', { name: 'Bỏ ảnh' })).toBeNull()
+    })
+
+    it('món chưa có công thức vẫn có một dòng để gõ', () => {
+      render(<ItemEditor set={foodSet} item={{ ...item, attrs: { ingredients: [], steps: [] } }} onClose={onClose} />)
+      expect(screen.getByLabelText('Nguyên liệu 1')).toHaveValue('')
+      expect(screen.getByLabelText('Bước 1')).toHaveValue('')
+    })
+
+    it('lỗi khi sửa: giữ dữ liệu, lời nhắn + Thử lại gọi lại update; đang lưu thì khoá', () => {
+      const { rerender } = render(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      fireEvent.change(screen.getByLabelText('Tên món'), { target: { value: 'Tên mới' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+      updateState = { isPending: false, error: new AppError('network'), ready: true }
+      rerender(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      expect(screen.getByLabelText('Tên món')).toHaveValue('Tên mới')
+      fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Thử lại' }))
+      expect(updateMutate).toHaveBeenCalledTimes(2)
+      expect(mutate).not.toHaveBeenCalled()
+      updateState = { isPending: true, error: null, ready: true }
+      rerender(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      expect(screen.getByLabelText('Tên món')).toBeDisabled()
+    })
+
+    it('đổi ảnh: gửi File; thành công thì toast + đóng', async () => {
+      const processed = { file: new File(['x'], 'moi.webp', { type: 'image/webp' }), previewUrl: 'blob:m', width: 1, height: 1 }
+      processImage.mockResolvedValue(processed)
+      render(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Đổi ảnh món' }))
+      fireEvent.change(screen.getByTestId('image-gallery'), { target: { files: [new File(['r'], 'a.jpg', { type: 'image/jpeg' })] } })
+      await waitFor(() => expect(document.querySelector('.image-picker__preview img')).toHaveAttribute('src', 'blob:m'))
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+      const [input, opts] = updateMutate.mock.calls[0]
+      expect(input.image).toBe(processed.file)
+      opts!.onSuccess!()
+      expect(useToast.getState().message).toBe('Đã lưu vào nồi!')
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('bỏ ảnh vừa chọn thì quay về ảnh đang có, không xoá ảnh đã upload', async () => {
+      processImage.mockResolvedValue({ file: new File(['x'], 'm.webp'), previewUrl: 'blob:n', width: 1, height: 1 })
+      render(<ItemEditor set={foodSet} item={item} onClose={onClose} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Đổi ảnh món' }))
+      fireEvent.change(screen.getByTestId('image-gallery'), { target: { files: [new File(['r'], 'a.jpg', { type: 'image/jpeg' })] } })
+      await waitFor(() => expect(document.querySelector('.image-picker__preview img')).toHaveAttribute('src', 'blob:n'))
+      fireEvent.click(screen.getByRole('button', { name: 'Đổi ảnh món' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Bỏ ảnh' }))
+      expect(document.querySelector('.image-picker__preview img')!.getAttribute('src')).toContain('cu.webp')
+      fireEvent.click(screen.getByRole('button', { name: 'Thôi' }))
+      // không còn thay đổi gì: đóng luôn, không hỏi
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('giữ tag ngoài facet; công thức không đọc được mà không đụng tới thì không ghi đè', () => {
+      render(<ItemEditor set={foodSet} item={{ ...item, tags: ['quanh-nam', 'tet'], attrs: 'hỏng' }} onClose={onClose} />)
+      fireEvent.change(screen.getByLabelText('Tên món'), { target: { value: 'Đổi tên' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+      const [input] = updateMutate.mock.calls[0]
+      expect(input.tags).toEqual(['tet', 'quanh-nam'])
+      expect(input.attrs).toBeUndefined()
+    })
+
+    it('bấm vào dòng trống rồi xoá lại không tính là thay đổi', () => {
+      render(<ItemEditor set={foodSet} item={{ ...item, attrs: { ingredients: [], steps: [] } }} onClose={onClose} />)
+      fireEvent.change(screen.getByLabelText('Nguyên liệu 1'), { target: { value: 'a' } })
+      fireEvent.change(screen.getByLabelText('Nguyên liệu 1'), { target: { value: '' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Thôi' }))
+      expect(onClose).toHaveBeenCalled()
+    })
   })
 })

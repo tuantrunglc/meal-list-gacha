@@ -4,7 +4,7 @@ import { ClientResponseError } from 'pocketbase'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCurrentHousehold } from './household'
-import { itemImageSources, seedSet, useCreateItem, useItems, type Item, type SeedSource } from './items'
+import { itemImageSources, seedSet, useCreateItem, useItems, useUpdateItem, type Item, type SeedSource } from './items'
 import { pb } from './pb'
 
 vi.mock('./auth', () => ({ useAuth: () => ({ isAuthenticated: true, userId: 'u1' }) }))
@@ -211,5 +211,34 @@ describe('useCreateItem', () => {
     fake.create.mockRejectedValueOnce(new ClientResponseError({ status: 400, response: { data: { id: { code: 'validation_not_unique' } } } }))
     await result.current.mutateAsync({ ...input, image })
     expect(fake.update.mock.calls[0][1].image).toBe(image)
+  })
+})
+
+describe('useUpdateItem', () => {
+  const base = { id: 'i1', groupKey: 'g', name: ' Tên ', rarity: 3 as const, tags: ['t'], attrs: {} }
+  const fields = { groupKey: 'g', name: 'Tên', rarity: 3, tags: ['t'], attrs: {} }
+
+  it('không đụng ảnh thì không gửi image; bỏ ảnh gửi null; ảnh mới gửi File; không gửi seedKey/setKey', async () => {
+    fake.update = vi.fn().mockResolvedValue({})
+    const { result } = renderHook(() => useUpdateItem('set-a'), { wrapper })
+    await result.current.mutateAsync(base)
+    expect(fake.update).toHaveBeenLastCalledWith('i1', fields)
+    await result.current.mutateAsync({ ...base, image: null })
+    expect(fake.update).toHaveBeenLastCalledWith('i1', { ...fields, image: null })
+    const file = new File(['x'], 'm.webp')
+    await result.current.mutateAsync({ ...base, image: file })
+    expect(fake.update.mock.calls.at(-1)![1].image).toBe(file)
+    for (const [, body] of fake.update.mock.calls) {
+      for (const k of ['seedKey', 'setKey', 'household']) expect(body).not.toHaveProperty(k)
+    }
+    // attrs undefined: giữ nguyên công thức
+    await result.current.mutateAsync({ ...base, attrs: undefined })
+    expect(fake.update.mock.calls.at(-1)![1]).not.toHaveProperty('attrs')
+  })
+
+  it('lỗi mạng là AppError', async () => {
+    fake.update = vi.fn().mockRejectedValue(new ClientResponseError({ status: 0 }))
+    const { result } = renderHook(() => useUpdateItem('set-a'), { wrapper })
+    await expect(result.current.mutateAsync(base)).rejects.toMatchObject({ code: 'network' })
   })
 })

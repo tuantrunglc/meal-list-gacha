@@ -16,4 +16,5 @@ export const foodCopy = {
   addStep: '＋ Thêm bước',
   removeStep: (n: number) => `Bỏ bước ${n}`,
   notePlaceholder: 'Mẹo nhỏ của nhà mình (không bắt buộc)',
+  noRecipe: 'Chưa có công thức, ghi lại bí kíp nè',
 } as const

@@ -2,15 +2,21 @@ import { forwardRef } from 'react'
 import { useItemImages } from '../../data/files'
 import type { Item } from '../../data/items'
 import type { SetDefinition } from '../../sets/types'
+import { copy } from '../../ui/copy'
 import { DishImage } from '../../ui/DishImage'
 import { GroupTag } from '../../ui/GroupTag'
 import { RarityBadge } from '../../ui/RarityBadge'
 import './ItemDetail.css'
 
-type Props = { item: Item; set: SetDefinition }
+type Props = {
+  item: Item
+  set: SetDefinition
+  /** Có thì hiện nút Sửa. */
+  onEdit?: () => void
+}
 
 /** Chi tiết món: phần chung (ảnh, tên, nhóm, độ hiếm, facet) + phần riêng của Bộ. Tên món nhận focus. */
-export const ItemDetail = forwardRef<HTMLHeadingElement, Props>(function ItemDetail({ item, set }, headingRef) {
+export const ItemDetail = forwardRef<HTMLHeadingElement, Props>(function ItemDetail({ item, set, onEdit }, headingRef) {
   const group = set.groups.find((g) => g.key === item.groupKey)
   const imagesOf = useItemImages()
   const DetailView = set.DetailView
@@ -35,6 +41,11 @@ export const ItemDetail = forwardRef<HTMLHeadingElement, Props>(function ItemDet
         ))}
       </div>
       <DetailView attrs={item.attrs} />
+      {onEdit && (
+        <button type="button" className="button-secondary item-detail__edit" onClick={onEdit}>
+          {copy.editor.editButton}
+        </button>
+      )}
     </article>
   )
 })

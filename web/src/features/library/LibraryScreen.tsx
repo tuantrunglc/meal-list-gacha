@@ -25,6 +25,8 @@ export function LibraryScreen() {
   )
   const [openId, setOpenId] = useState<string | null>(null)
   const [editor, setEditor] = useState<EditorPrefill | null>(null)
+  // Sửa món: đóng chi tiết, mở form; xong mở lại chi tiết món đó
+  const [editingItem, setEditingItem] = useState<Item | null>(null)
   const detailHeading = useRef<HTMLHeadingElement>(null)
   const filtered = query.trim() === '' && (group !== ALL || Object.values(facets).some((v) => v !== ALL))
 
@@ -133,13 +135,31 @@ export function LibraryScreen() {
       </button>
 
       {editor && <ItemEditor set={set} prefill={editor} onClose={() => setEditor(null)} />}
+      {editingItem && (
+        <ItemEditor
+          set={set}
+          item={editingItem}
+          onClose={() => {
+            setEditingItem(null)
+            setOpenId(editingItem.id)
+          }}
+        />
+      )}
 
       {openItem && (
         <Modal label={copy.tray.detailTitle(openItem.name)} onClose={() => setOpenId(null)} initialFocusRef={detailHeading}>
           <button type="button" className="library__close" onClick={() => setOpenId(null)}>
             {copy.library.detailClose}
           </button>
-          <ItemDetail item={openItem} set={set} ref={detailHeading} />
+          <ItemDetail
+            item={openItem}
+            set={set}
+            ref={detailHeading}
+            onEdit={() => {
+              setOpenId(null)
+              setEditingItem(openItem)
+            }}
+          />
         </Modal>
       )}
     </div>

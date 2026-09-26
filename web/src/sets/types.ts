@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import type { EngineFacet, EngineSet, Rarity } from '../engine'
 
 export type GroupDefinition = {
@@ -54,6 +54,14 @@ export type SetDefinition<A = unknown> = Omit<EngineSet, 'facets'> & {
   }
   /** Hiển thị phần riêng của Bộ trong Chi tiết món (ví dụ công thức). */
   DetailView: ComponentType<{ attrs: unknown }>
+  /**
+   * Trình soạn phần riêng của Bộ trong form Thêm/Sửa món.
+   * Khai báo kiểu method để registry chứa được mọi `SetDefinition<A>`; form luôn truyền
+   * giá trị đã qua `parseAttrs`/`emptyAttrs` của chính Bộ đó.
+   */
+  AttrsEditor(props: { value: A; onChange: (value: A) => void; disabled?: boolean }): ReactNode
+  /** Giá trị `attrs` cho món mới. */
+  emptyAttrs: () => A
   /** Kiểm tra `items.attrs` theo schema riêng của Bộ. */
   parseAttrs: (raw: unknown) => AttrsResult<A>
   seed: readonly SeedItem<A>[]

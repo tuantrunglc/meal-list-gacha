@@ -1,6 +1,7 @@
 import type { SetDefinition } from '../types'
 import { parseFoodAttrs, type FoodAttrs } from './attrs'
 import { foodCopy } from './copy'
+import { FoodAttrsEditor } from './FoodAttrsEditor'
 import { FoodDetail } from './FoodDetail'
 import { foodSeed } from './seed'
 
@@ -45,6 +46,8 @@ export const foodSet: SetDefinition<FoodAttrs> = {
   ],
   messages: { emptySlot: foodCopy.emptySlot, changeFilter: foodCopy.changeFilter },
   DetailView: FoodDetail,
+  AttrsEditor: FoodAttrsEditor,
+  emptyAttrs: () => ({ ingredients: [''], steps: [''] }),
   parseAttrs: parseFoodAttrs,
   seed: foodSeed,
 }

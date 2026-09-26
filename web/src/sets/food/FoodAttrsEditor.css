@@ -1,0 +1,72 @@
+.food-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.food-editor__list {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.food-editor__heading {
+  display: block;
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-family: var(--text-title-family);
+  font-size: 1.125rem;
+  font-weight: var(--text-title-weight);
+}
+
+.food-editor__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.food-editor__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.food-editor__line .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.food-editor__number {
+  flex: none;
+  min-width: 1.6em;
+  font-weight: 700;
+  color: var(--color-ink-secondary);
+}
+
+.food-editor__remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.food-editor__add {
+  margin-top: var(--space-2);
+}
+
+.food-editor__note {
+  min-height: 88px;
+  padding-top: var(--space-2);
+  resize: vertical;
+  font: inherit;
+}

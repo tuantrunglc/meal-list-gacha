@@ -9,4 +9,11 @@ export const foodCopy = {
   ingredients: 'Nguyên liệu',
   steps: 'Các bước',
   note: 'Ghi chú',
+  ingredientLine: (n: number) => `Nguyên liệu ${n}`,
+  addIngredient: '＋ Thêm nguyên liệu',
+  removeIngredient: (n: number) => `Bỏ nguyên liệu ${n}`,
+  stepLine: (n: number) => `Bước ${n}`,
+  addStep: '＋ Thêm bước',
+  removeStep: (n: number) => `Bỏ bước ${n}`,
+  notePlaceholder: 'Mẹo nhỏ của nhà mình (không bắt buộc)',
 } as const

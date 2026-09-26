@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { ClientResponseError } from 'pocketbase'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { toIsoDate, useCommitTray, useDrawHistory, useHasDraws, useRecentDraws } from './draws'
+import { toIsoDate, useCommitTray, useDeleteDraw, useDrawHistory, useHasDraws, useRecentDraws } from './draws'
 import { pb } from './pb'
 
 vi.mock('./auth', () => ({ useAuth: () => ({ isAuthenticated: true, userId: 'u1' }) }))
@@ -138,5 +138,42 @@ describe('useDrawHistory', () => {
     await waitFor(() => expect(result.current.data?.pages).toHaveLength(2))
     expect(result.current.hasNextPage).toBe(false)
     expect(result.current.data!.pages[0].items[0].chosenAt).toBe('2026-09-26T10:00:00.000Z')
+  })
+})
+
+describe('useDeleteDraw', () => {
+  it('xoá hẳn draw; 404 (đã xoá ở máy khác) coi là xong; lỗi mạng là AppError', async () => {
+    const { result } = renderHook(() => useDeleteDraw('food'), { wrapper })
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    await result.current.mutateAsync('d1')
+    expect(fake.delete).toHaveBeenCalledWith('d1')
+    fake.delete.mockRejectedValueOnce(new ClientResponseError({ status: 404 }))
+    await expect(result.current.mutateAsync('d1')).resolves.toBeUndefined()
+    fake.delete.mockRejectedValueOnce(new ClientResponseError({ status: 0 }))
+    await expect(result.current.mutateAsync('d1')).rejects.toMatchObject({ code: 'network' })
+  })
+})
+
+describe('useDeleteDraw cập nhật cache', () => {
+  it('bỏ ngay mâm khỏi lịch sử và mâm gần đây, gọi onDeleted, rồi làm mới', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const w = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    const d = { id: 'd1', chosenAt: '2026-09-26 10:00:00.000Z', entries: [{ itemId: 'x', groupKey: 'g', name: 'X', rarity: 1, order: 0 }] }
+    fake.getFullList.mockResolvedValue([d])
+    fake.getList.mockResolvedValue({ items: [d], page: 1, totalPages: 1 })
+    const recent = renderHook(() => useRecentDraws('food', 3), { wrapper: w })
+    const history = renderHook(() => useDrawHistory('food'), { wrapper: w })
+    await waitFor(() => expect(recent.result.current.data).toHaveLength(1))
+    await waitFor(() => expect(history.result.current.data?.pages[0].items).toHaveLength(1))
+    const onDeleted = vi.fn()
+    const del = renderHook(() => useDeleteDraw('food', onDeleted), { wrapper: w })
+    await waitFor(() => expect(del.result.current.ready).toBe(true))
+    // tải lại treo: cache phải đổi ngay nhờ cập nhật tại chỗ
+    fake.getFullList.mockReturnValue(new Promise(() => {}))
+    fake.getList.mockReturnValue(new Promise(() => {}))
+    await del.result.current.mutateAsync('d1')
+    expect(onDeleted).toHaveBeenCalledOnce()
+    await waitFor(() => expect(recent.result.current.data).toEqual([]))
+    expect(history.result.current.data?.pages[0].items).toEqual([])
   })
 })

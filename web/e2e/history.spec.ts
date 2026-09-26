@@ -55,3 +55,30 @@ test('món đã xoá vẫn hiện trong lịch sử và mở được', async ({
     await page.request.delete(`${API}/collections/draws/records/${drawId}`, { headers: { Authorization: t } })
   }
 })
+
+test('xoá mâm: draw mất khỏi server, hàng biến mất', async ({ page }) => {
+  await login(page)
+  const t = await token(page)
+  const hh = (await (await page.request.get(`${API}/collections/households/records`, { headers: { Authorization: t } })).json()).items[0].id
+  const name = `E2E mâm sẽ xoá ${Date.now()}`
+  const drawRes = await page.request.post(`${API}/collections/draws/records`, {
+    headers: { Authorization: t },
+    data: { household: hh, setKey: 'food', chosenAt: new Date().toISOString(), entries: [{ itemId: 'khongconnua1234', groupKey: 'man', name, rarity: 1, order: 0 }] },
+  })
+  expect(drawRes.ok(), await drawRes.text()).toBe(true)
+  const drawId = ((await drawRes.json()) as { id: string }).id
+  try {
+    await page.getByRole('link', { name: 'Lịch sử' }).click()
+    const row = page.getByRole('listitem', { name: /^Mâm / }).filter({ hasText: name })
+    await row.getByRole('button', { name: /^Xoá mâm/ }).click()
+    await page.getByRole('alertdialog', { name: 'Xoá mâm này?' }).getByRole('button', { name: 'Xoá' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Đã xoá mâm.' })).toBeVisible()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect(row).toHaveCount(0)
+    const check = await page.request.get(`${API}/collections/draws/records/${drawId}`, { headers: { Authorization: t } })
+    expect(check.status()).toBe(404)
+  } finally {
+    // dọn nếu test hỏng trước khi xoá qua giao diện (đã xoá thì 404, bỏ qua)
+    await page.request.delete(`${API}/collections/draws/records/${drawId}`, { headers: { Authorization: t } })
+  }
+})

@@ -172,3 +172,33 @@ export function useCommitTray(setKey: string, onCommitted?: () => void) {
     },
   })
 }
+
+/** Xoá hẳn một mâm đã chốt (draw chỉ create/delete). Đã bị xoá ở máy khác (404) coi là xong. */
+export function useDeleteDraw(setKey: string, onDeleted?: () => void) {
+  const household = useCurrentHousehold()
+  const queryClient = useQueryClient()
+  const householdId = household.data?.id
+  const mutation = useMutation<void, AppError, string>({
+    mutationFn: async (id) => {
+      try {
+        await pb.collection('draws').delete(id)
+      } catch (err) {
+        if (err instanceof ClientResponseError && err.status === 404) return
+        throw toAppError(err)
+      }
+    },
+    // Callback ở cấp hook: vẫn chạy nếu màn đã rời đi (per-call callback bị bỏ khi unmount)
+    onSuccess: (_data, id) => {
+      const key = queryKeys.draws(householdId ?? '', setKey)
+      // Bỏ ngay khỏi cache để hàng biến mất và món thôi bị tránh trùng, không chờ tải lại
+      queryClient.setQueriesData<{ pages: { items: Draw[] }[]; pageParams: unknown[] }>({ queryKey: [...key, 'history'] }, (old) =>
+        old ? { ...old, pages: old.pages.map((p) => ({ ...p, items: p.items.filter((d) => d.id !== id) })) } : old,
+      )
+      queryClient.setQueriesData<Draw[]>({ queryKey: [...key, 'recent'] }, (old) => old?.filter((d) => d.id !== id))
+      // Làm mới lịch sử, mâm gần đây (tránh trùng) và "đã có mâm"
+      void queryClient.invalidateQueries({ queryKey: key })
+      onDeleted?.()
+    },
+  })
+  return Object.assign(mutation, { ready: !!householdId })
+}

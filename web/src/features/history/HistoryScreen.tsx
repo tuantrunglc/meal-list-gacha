@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useDrawHistory, type Draw, type DrawEntry } from '../../data/draws'
+import { useDeleteDraw, useDrawHistory, type Draw, type DrawEntry } from '../../data/draws'
 import { useCurrentHousehold } from '../../data/household'
 import { useItemImages } from '../../data/files'
 import { useItems, type Item } from '../../data/items'
 import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
 import { copy } from '../../ui/copy'
-import { DishImage } from '../../ui/DishImage'
+import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { Modal } from '../../ui/Modal'
+import { showToast } from '../../ui/toast'
 import { ItemDetail } from '../item-detail/ItemDetail'
-import { formatChosenAt } from './format'
+import { HistoryRow } from './HistoryRow'
 import './HistoryScreen.css'
 
 /**
@@ -42,6 +43,11 @@ export function HistoryScreen() {
   const items = useItems(set)
   const imagesOf = useItemImages()
   const [open, setOpen] = useState<{ entry: DrawEntry } | null>(null)
+  const [deleting, setDeleting] = useState<Draw | null>(null)
+  const deleteDraw = useDeleteDraw(set.setKey, () => {
+    showToast(copy.history.deleted)
+    setDeleting(null)
+  })
   const sentinel = useRef<HTMLDivElement>(null)
   const byId = useMemo(() => new Map((items.all ?? []).map((i) => [i.id, i])), [items.all])
   // Phân trang theo số trang: chốt/xoá mâm giữa hai lần tải có thể đẩy một mâm sang trang sau → bỏ trùng
@@ -96,34 +102,16 @@ export function HistoryScreen() {
         </p>
       ) : (
         <ul className="history__list">
-          {draws.map((draw) => {
-            const when = formatChosenAt(draw.chosenAt)
-            const entries = [...draw.entries].sort((a, b) => a.order - b.order)
-            if (!when && entries.length === 0) return null
-            return (
-              <li key={draw.id} className="history-row" aria-label={copy.history.trayLabel(when)}>
-                <p className="history-row__when">{when}</p>
-                <ul className="history-row__dishes">
-                  {entries.map((entry) => {
-                    const item = itemForEntry(entry, byId, set.setKey)
-                    return (
-                      <li key={`${entry.order}:${entry.itemId}`}>
-                        <button
-                          type="button"
-                          className="history-row__dish"
-                          aria-label={copy.history.openDish(entry.name)}
-                          onClick={() => setOpen({ entry })}
-                        >
-                          <DishImage className="history-row__thumb" sources={imagesOf(item, 'thumb')} alt="" compact />
-                          <span className="history-row__name">{entry.name}</span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </li>
-            )
-          })}
+          {draws.map((draw) => (
+            <HistoryRow
+              key={draw.id}
+              draw={draw}
+              itemFor={(entry) => itemForEntry(entry, byId, set.setKey)}
+              imagesOf={imagesOf}
+              onOpenDish={(entry) => setOpen({ entry })}
+              onDelete={() => setDeleting(draw)}
+            />
+          ))}
         </ul>
       )}
 
@@ -161,6 +149,22 @@ export function HistoryScreen() {
             </p>
           )}
         </Modal>
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title={copy.history.deleteTitle}
+          body={copy.history.deleteBody}
+          confirmLabel={copy.history.deleteConfirm}
+          busyLabel={copy.history.deleting}
+          busy={deleteDraw.isPending}
+          confirmDisabled={!deleteDraw.ready}
+          error={deleteDraw.error?.message}
+          onCancel={() => {
+            deleteDraw.reset()
+            setDeleting(null)
+          }}
+          onConfirm={() => deleteDraw.mutate(deleting.id)}
+        />
       )}
     </div>
   )

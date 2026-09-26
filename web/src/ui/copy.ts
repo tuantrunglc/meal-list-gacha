@@ -1,5 +1,9 @@
 // Chuỗi hiển thị dùng chung. Chuỗi riêng của một Bộ nằm ở sets/<setKey>/copy.ts.
 export const copy = {
+  common: {
+    cancel: 'Thôi',
+    swipeDelete: 'Xoá',
+  },
   tabBar: {
     label: 'Điều hướng chính',
     spin: 'Quay',
@@ -109,6 +113,13 @@ export const copy = {
     loadingMore: 'Đang tải thêm…',
     openDish: (name: string) => `Xem công thức ${name}`,
     trayLabel: (when: string) => `Mâm ${when}`,
+    deleteButton: (when: string) => `Xoá mâm ${when}`,
+    unknownTime: 'không rõ giờ',
+    deleteTitle: 'Xoá mâm này?',
+    deleteBody: 'Mấy món trong mâm sẽ được quay lại ngay.',
+    deleteConfirm: 'Xoá',
+    deleting: 'Đang xoá…',
+    deleted: 'Đã xoá mâm.',
   },
   screens: {
     library: 'Sổ món của nhà',

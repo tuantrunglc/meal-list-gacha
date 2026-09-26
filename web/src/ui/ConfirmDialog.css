@@ -1,4 +1,4 @@
-.delete-confirm {
+.confirm-dialog {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -7,23 +7,23 @@
   background: var(--color-surface-raised);
 }
 
-.delete-confirm__title {
+.confirm-dialog__title {
   margin: 0;
   font-family: var(--text-title-family);
   font-size: var(--text-title-size);
   font-weight: var(--text-title-weight);
 }
 
-.delete-confirm__title:focus {
+.confirm-dialog__title:focus {
   outline: none;
 }
 
-.delete-confirm__actions {
+.confirm-dialog__actions {
   display: flex;
   gap: var(--space-3);
   margin-top: var(--space-2);
 }
 
-.delete-confirm__actions > * {
+.confirm-dialog__actions > * {
   flex: 1;
 }

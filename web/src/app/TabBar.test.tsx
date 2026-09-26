@@ -12,6 +12,7 @@ vi.mock('../data/draws', () => ({
   useRecentDraws: () => ({ data: [], isPending: false, fetchStatus: 'idle' }),
   useHasDraws: () => ({ data: false }),
   useDrawHistory: () => ({ data: { pages: [{ items: [], page: 1, totalPages: 1 }] }, hasNextPage: false }),
+  useDeleteDraw: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
   useCommitTray: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null }),
 }))
 

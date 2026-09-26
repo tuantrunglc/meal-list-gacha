@@ -33,9 +33,9 @@ test('đăng nhập từ link sâu thì vào màn Quay, tải lại vẫn còn p
   await page.getByLabel('Mật khẩu').fill(OWNER.password)
   await page.getByRole('button', { name: 'Vào bếp thôi!' }).click()
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('heading', { name: 'Mở nồi' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nay ăn gì cả nhà?' })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Mở nồi' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nay ăn gì cả nhà?' })).toBeVisible()
 })
 
 test('API: chủ app thấy household của mình', async ({ page, request }) => {

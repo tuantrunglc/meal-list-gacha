@@ -36,7 +36,7 @@ test('vào app thì nồi có đủ đúng món mặc định, không báo lỗi
   await expect(page.getByRole('alert')).toHaveCount(0)
 
   await page.reload()
-  await page.getByRole('heading', { name: 'Mở nồi' }).waitFor()
+  await page.getByRole('heading', { name: 'Nay ăn gì cả nhà?' }).waitFor()
   await page.waitForLoadState('networkidle')
   expect((await listItems(request, token)).totalItems).toBe(foodSet.seed.length)
 })

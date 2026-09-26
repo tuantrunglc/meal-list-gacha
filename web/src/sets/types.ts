@@ -44,6 +44,13 @@ export type SetDefinition<A = unknown> = Omit<EngineSet, 'facets'> & {
   slotTemplate: readonly SlotTemplateEntry[]
   defaultCooldownDays: number
   facets: readonly FacetDefinition[]
+  /** Câu chữ riêng của Bộ trên màn Quay/Mâm. */
+  messages: {
+    /** Ô không còn món hợp lệ, ví dụ "Hết món Canh mùa này rồi 😅". */
+    emptySlot: (groupLabel: string) => string
+    /** Nút mở lại bộ lọc facet, ví dụ "Đổi mùa". */
+    changeFilter: string
+  }
   /** Kiểm tra `items.attrs` theo schema riêng của Bộ. */
   parseAttrs: (raw: unknown) => AttrsResult<A>
   seed: readonly SeedItem<A>[]

@@ -1,23 +1,135 @@
-import { useItems } from '../../data/items'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useItems, type Item } from '../../data/items'
+import { drawSlots, type EngineItem } from '../../engine'
 import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
+import type { SetDefinition } from '../../sets/types'
+import { ChipGroup } from '../../ui/ChipGroup'
 import { copy } from '../../ui/copy'
+import { GachaPot } from '../../ui/GachaPot'
+import { useReducedMotion } from '../../ui/useReducedMotion'
+import { MealTray } from '../tray/MealTray'
+import { useTrayStore } from '../tray/store'
+import './SpinScreen.css'
 
-export function SpinScreen() {
+const SPIN_MS = 1500
+const SPIN_MS_REDUCED = 300
+
+function defaultFilters(set: SetDefinition, now: Date): Record<string, string> {
+  return Object.fromEntries(set.facets.map((f) => [f.key, f.defaultValue(now)]))
+}
+
+function toEngineItem(item: Item): EngineItem {
+  return { id: item.id, groupKey: item.groupKey, rarity: item.rarity, tags: item.tags, deleted: item.deleted }
+}
+
+type Props = {
+  /** Đã có mâm nào được chốt chưa (Story 1.8 nối vào lịch sử). */
+  hasHistory?: boolean
+}
+
+export function SpinScreen({ hasHistory = false }: Props) {
   const set = getSet(DEFAULT_SET_KEY)
   // Lần đầu mở app: household chưa có món thì nạp món mặc định của Bộ
   const items = useItems(set)
+  const [filters, setFilters] = useState(() => defaultFilters(set, new Date()))
+  const [spinning, setSpinning] = useState(false)
+  const reducedMotion = useReducedMotion()
+  const showResult = useTrayStore((s) => s.showResult)
+  const facetRefs = useRef<(HTMLDivElement | null)[]>([])
+  const spinButton = useRef<HTMLButtonElement>(null)
+  const timer = useRef<number | undefined>(undefined)
+
+  const itemsById = useMemo(() => new Map((items.data ?? []).map((i) => [i.id, i])), [items.data])
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(timer.current)
+      // Rời màn Quay thì đóng mâm; quay lại không tự bật mâm cũ
+      useTrayStore.getState().close()
+    },
+    [],
+  )
+
+  function spin() {
+    if (spinning || !items.data) return
+    // Quay ngay (engine thuần), phần chờ chỉ là hiệu ứng nồi sôi
+    const result = drawSlots({
+      set,
+      items: items.data.map(toEngineItem),
+      recentDraws: [],
+      cooldownDays: set.defaultCooldownDays,
+      slots: set.slotTemplate.map((s, i) => ({ id: `slot-${i}`, groupKey: s.groupKey, itemId: null, keep: false })),
+      filters,
+      now: new Date(),
+      rng: Math.random,
+    })
+    const removable = new Set(set.slotTemplate.flatMap((s, i) => (s.removable ? [`slot-${i}`] : [])))
+    setSpinning(true)
+    timer.current = window.setTimeout(
+      () => {
+        setSpinning(false)
+        showResult(result, removable)
+      },
+      reducedMotion ? SPIN_MS_REDUCED : SPIN_MS,
+    )
+  }
+
+  function focusFilters() {
+    const group = facetRefs.current.find(Boolean)
+    const checked = group?.querySelector<HTMLElement>('[aria-checked="true"]')
+    ;(checked ?? group ?? spinButton.current)?.focus()
+  }
 
   return (
-    <>
-      <h1 className="screen-title">{copy.screens.spin}</h1>
-      {items.error && (
-        <div role="alert">
+    <div className="spin-screen">
+      <div className="spin-screen__top">
+        <button type="button" className="set-picker" aria-disabled="true">
+          {copy.spin.setPicker(set.label)} <span aria-hidden="true">▾</span>
+        </button>
+      </div>
+      <h1 className="spin-screen__greeting">{copy.spin.greeting}</h1>
+
+      {set.facets.map((facet, i) => (
+        <ChipGroup
+          key={facet.key}
+          ref={(el) => {
+            facetRefs.current[i] = el
+          }}
+          label={facet.label}
+          options={facet.values}
+          value={filters[facet.key]}
+          onChange={(value) => setFilters((f) => ({ ...f, [facet.key]: value }))}
+        />
+      ))}
+
+      <div className="spin-screen__stage">
+        <GachaPot boiling={spinning} />
+      </div>
+
+      {items.error ? (
+        <div className="spin-screen__error" role="alert">
           <p className="form-error">{items.error.message}</p>
           <button type="button" className="button-secondary" onClick={() => void items.refetch()}>
             {copy.retry}
           </button>
         </div>
+      ) : (
+        !hasHistory && <p className="spin-screen__hint">{copy.spin.firstHint}</p>
       )}
-    </>
+
+      <button
+        ref={spinButton}
+        type="button"
+        className="spin-button"
+        onClick={spin}
+        disabled={!items.data}
+        aria-disabled={spinning || undefined}
+        data-spinning={spinning || undefined}
+      >
+        {spinning ? copy.spin.spinning : copy.spin.button}
+      </button>
+
+      <MealTray set={set} itemsById={itemsById} onChangeFilter={focusFilters} />
+    </div>
   )
 }

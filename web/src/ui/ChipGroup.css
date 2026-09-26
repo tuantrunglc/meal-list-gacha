@@ -1,0 +1,59 @@
+.chip-group {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-block: var(--space-1);
+  scrollbar-width: none;
+}
+
+.chip-group:focus {
+  outline: none;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  /* 36px nhìn thấy, vùng chạm kéo dài tới 44px */
+  height: 36px;
+  margin-block: 4px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-primary);
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  white-space: nowrap;
+  cursor: pointer;
+  position: relative;
+}
+
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+.chip__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.chip--on {
+  background: var(--color-accent-tile);
+  border-color: var(--color-accent-tile);
+  color: #fff;
+}
+
+.chip--on .chip__dot {
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-accent-tile);
+  outline-offset: 2px;
+}

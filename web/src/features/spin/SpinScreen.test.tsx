@@ -1,31 +1,190 @@
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../data/errors'
-import type { ItemsResult } from '../../data/items'
+import type { Item, ItemsResult } from '../../data/items'
+import { foodSet } from '../../sets/food/definition'
+import { useTrayStore } from '../tray/store'
 import { SpinScreen } from './SpinScreen'
 
 const refetch = vi.fn(async () => {})
 let state: ItemsResult
 
-vi.mock('../../data/items', () => ({ useItems: () => state }))
+vi.mock('../../data/items', () => ({
+  useItems: () => state,
+  itemImageSources: () => [],
+}))
+
+function toItems(filter: (d: (typeof foodSet.seed)[number]) => boolean = () => true): Item[] {
+  return foodSet.seed.filter(filter).map((d) => ({
+    id: d.seedKey,
+    household: 'h',
+    setKey: 'food',
+    groupKey: d.groupKey,
+    name: d.name,
+    rarity: d.rarity,
+    tags: d.tags,
+    attrs: d.attrs,
+    seedKey: d.seedKey,
+    deleted: false,
+    imageFile: '',
+    collectionId: 'c',
+    updated: '',
+  }))
+}
+
+function spinAndWait() {
+  fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+  act(() => vi.advanceTimersByTime(1600))
+  // câu đọc được đặt sau khi mâm hiện
+  act(() => vi.advanceTimersByTime(60))
+}
+
+const live = () => screen.getByRole('dialog').querySelector('[aria-live="polite"]')!.textContent
+
+function expectedAnnouncement() {
+  const parts = useTrayStore.getState().slots.map((s) => {
+    const g = foodSet.groups.find((x) => x.key === s.groupKey)!.label
+    const d = foodSet.seed.find((x) => x.seedKey === s.itemId)
+    if (!d) return `${g} hết món`
+    const r = { 1: 'Thường', 2: 'Ngon', 3: 'Đặc biệt' }[d.rarity]
+    return `${g} ${d.name}, ${r}`
+  })
+  return `Mâm cơm: ${parts.join('; ')}`
+}
+
+const initialTray = useTrayStore.getState()
 
 describe('SpinScreen', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    vi.setSystemTime(new Date(2026, 8, 26, 17, 0))
     refetch.mockClear()
-    state = { data: [], error: null, isPending: false, isError: false, refetch }
+    useTrayStore.setState({ ...initialTray, open: false, slots: [] })
+    state = { data: toItems(), error: null, isPending: false, isError: false, refetch }
   })
 
-  it('lỗi thì hiện lời nhắn thân thiện và nút Thử lại', async () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('mặc định chọn mùa theo tháng (tháng 9 → Thu), có gợi ý lần đầu và tiêu đề Bộ', () => {
+    render(<SpinScreen />)
+    expect(screen.getByRole('radio', { name: 'Thu' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('Mở thử đi cả nhà!')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Bộ: Món ăn/ })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('quay: khoá khi đang sôi, chạm thêm không quay lại, xong thì mở mâm 3 ô và đọc đúng câu', () => {
+    const showResult = vi.spyOn(useTrayStore.getState(), 'showResult')
+    useTrayStore.setState({ showResult })
+    render(<SpinScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+    expect(screen.getByRole('button', { name: 'Nồi đang sôi…' })).toHaveAttribute('aria-disabled', 'true')
+    act(() => vi.advanceTimersByTime(500))
+    fireEvent.click(screen.getByRole('button', { name: 'Nồi đang sôi…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nồi đang sôi…' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => vi.advanceTimersByTime(1100))
+    act(() => vi.advanceTimersByTime(60))
+
+    expect(showResult).toHaveBeenCalledOnce()
+    const dialog = screen.getByRole('dialog', { name: 'Mâm cơm' })
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+    // câu đọc đầy đủ: nhóm, tên, bậc theo đúng thứ tự trên mâm
+    expect(live()).toBe(expectedAnnouncement())
+    expect(live()).not.toContain('undefined')
+  })
+
+  it('giảm chuyển động: mâm hiện sau 300ms', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: q.includes('prefers-reduced-motion'),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+    try {
+      render(<SpinScreen />)
+      fireEvent.click(screen.getByRole('button', { name: 'Mở nồi!' }))
+      act(() => vi.advanceTimersByTime(250))
+      expect(screen.queryByRole('dialog')).toBeNull()
+      act(() => vi.advanceTimersByTime(60))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('đóng mâm thì focus về nút Mở nồi!; Tab không thoát khỏi mâm', () => {
+    render(<SpinScreen />)
+    screen.getByRole('button', { name: 'Mở nồi!' }).focus()
+    spinAndWait()
+    const dialog = screen.getByRole('dialog')
+    const close = within(dialog).getByRole('button', { name: 'Để sau' })
+    close.focus()
+    fireEvent.keyDown(close, { key: 'Tab' })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    fireEvent.click(close)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Mở nồi!' }))
+  })
+
+  it('rời màn Quay thì đóng mâm', () => {
+    const { unmount } = render(<SpinScreen />)
+    spinAndWait()
+    unmount()
+    expect(useTrayStore.getState().open).toBe(false)
+  })
+
+  it('mùa Thu: mọi món trên mâm là món Thu hoặc quanh năm', () => {
+    render(<SpinScreen />)
+    spinAndWait()
+    for (const s of useTrayStore.getState().slots) {
+      const tags = foodSet.seed.find((d) => d.seedKey === s.itemId)!.tags
+      expect(tags.some((t) => t === 'thu' || t === 'quanh-nam')).toBe(true)
+    }
+  })
+
+  it('đổi chip sang Hạ rồi quay thì chỉ ra món Hạ hoặc quanh năm', () => {
+    render(<SpinScreen />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Hạ' }))
+    expect(screen.getByRole('radio', { name: 'Hạ' })).toHaveAttribute('aria-checked', 'true')
+    spinAndWait()
+    for (const s of useTrayStore.getState().slots) {
+      const tags = foodSet.seed.find((d) => d.seedKey === s.itemId)!.tags
+      expect(tags.some((t) => t === 'ha' || t === 'quanh-nam')).toBe(true)
+    }
+  })
+
+  it('nhóm hết món: riêng ô đó báo hết + "Đổi mùa" đóng mâm và focus chip mùa', () => {
+    state = { ...state, data: toItems((d) => d.groupKey !== 'canh') }
+    render(<SpinScreen />)
+    spinAndWait()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Hết món Canh mùa này rồi 😅')).toBeInTheDocument()
+    expect(live()).toContain('Canh hết món')
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Đổi mùa' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Thu' }))
+  })
+
+  it('Esc và "Để sau" đóng mâm', () => {
+    render(<SpinScreen />)
+    spinAndWait()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    spinAndWait()
+    fireEvent.click(screen.getByRole('button', { name: 'Để sau' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('chưa tải xong món thì nút khoá', () => {
+    state = { ...state, data: undefined, isPending: true }
+    render(<SpinScreen />)
+    expect(screen.getByRole('button', { name: 'Mở nồi!' })).toBeDisabled()
+  })
+
+  it('lỗi thì hiện lời nhắn thân thiện và nút Thử lại', () => {
     state = { ...state, data: undefined, error: new AppError('network'), isError: true }
     render(<SpinScreen />)
     expect(screen.getByRole('alert')).toHaveTextContent('Mất mạng rồi, kiểm tra wifi rồi thử lại nhé.')
-    await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }))
     expect(refetch).toHaveBeenCalledOnce()
-  })
-
-  it('không lỗi thì không có alert', () => {
-    render(<SpinScreen />)
-    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

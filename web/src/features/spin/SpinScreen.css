@@ -1,0 +1,110 @@
+.spin-screen {
+  display: flex;
+  flex-direction: column;
+  /* chiều cao màn trừ tab bar và lề của .app-main để nút Quay nằm ở vùng ngón cái */
+  min-height: calc(100dvh - var(--tab-bar-height) - var(--space-4) - var(--space-5) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+/* Hoạ tiết gạch bông mờ phủ nền màn Quay */
+.spin-screen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image:
+    radial-gradient(circle at 50% 50%, transparent 9px, var(--color-accent-tile) 10px, var(--color-accent-tile) 12px, transparent 13px),
+    conic-gradient(from 45deg, var(--color-accent-tile) 0 25%, transparent 0 50%, var(--color-accent-tile) 0 75%, transparent 0);
+  background-size: 56px 56px, 28px 28px;
+}
+
+.spin-screen__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.set-picker {
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-secondary);
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+}
+
+.set-picker[aria-disabled='true'] {
+  cursor: default;
+}
+
+.spin-screen__greeting {
+  margin: var(--space-3) 0 var(--space-2);
+  font-family: var(--text-display-family);
+  font-size: var(--text-display-size);
+  font-weight: var(--text-display-weight);
+  line-height: var(--text-display-line);
+}
+
+.spin-screen__stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}
+
+.spin-screen__hint {
+  text-align: center;
+  color: var(--color-ink-secondary);
+}
+
+.spin-screen__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.spin-button {
+  display: block;
+  width: calc(100% - var(--space-6));
+  height: 64px;
+  margin: var(--space-4) auto 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--text-title-family);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  box-shadow: 0 6px 0 var(--color-primary-pressed), var(--shadow-soft);
+  cursor: pointer;
+  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out;
+}
+
+.spin-button:active:not(:disabled):not([data-spinning]) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 var(--color-primary-pressed), var(--shadow-soft);
+}
+
+.spin-button[data-spinning] {
+  background: var(--color-primary-pressed);
+  box-shadow: 0 2px 0 var(--color-primary-pressed);
+  transform: translateY(4px);
+  cursor: default;
+}
+
+.spin-button:disabled {
+  background: var(--color-ink-disabled);
+  box-shadow: none;
+  cursor: default;
+}
+
+.spin-button:focus-visible {
+  outline: 3px solid var(--color-accent-tile);
+  outline-offset: 3px;
+}

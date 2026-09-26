@@ -24,8 +24,22 @@ export const copy = {
     empty: 'Thêm ảnh',
   },
   retry: 'Thử lại',
+  spin: {
+    setPicker: (label: string) => `Bộ: ${label}`,
+    greeting: 'Nay ăn gì cả nhà?',
+    firstHint: 'Mở thử đi cả nhà!',
+    button: 'Mở nồi!',
+    spinning: 'Nồi đang sôi…',
+  },
+  tray: {
+    title: 'Mâm cơm',
+    say: 'Nồi Thần dọn mâm!',
+    close: 'Để sau',
+    announce: (parts: string[]) => `Mâm cơm: ${parts.join('; ')}`,
+    announcePart: (group: string, name: string, rarity: string) => `${group} ${name}, ${rarity}`,
+    announceEmpty: (group: string) => `${group} hết món`,
+  },
   screens: {
-    spin: 'Mở nồi',
     library: 'Sổ món của nhà',
     history: 'Mâm đã chốt',
   },

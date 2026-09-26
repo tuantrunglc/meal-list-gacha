@@ -42,6 +42,7 @@ export const foodSet: SetDefinition<FoodAttrs> = {
       defaultValue: seasonForMonth,
     },
   ],
+  messages: { emptySlot: foodCopy.emptySlot, changeFilter: foodCopy.changeFilter },
   parseAttrs: parseFoodAttrs,
   seed: foodSeed,
 }

@@ -3,7 +3,7 @@ import { login } from './helpers.ts'
 
 test('đăng nhập rồi thấy màn Quay và thanh tab', async ({ page }) => {
   await login(page)
-  await expect(page.getByRole('heading', { name: 'Mở nồi' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nay ăn gì cả nhà?' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Quay' })).toHaveAttribute('aria-current', 'page')
 })
 

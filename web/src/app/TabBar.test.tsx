@@ -51,7 +51,7 @@ describe('TabBar', () => {
 
   it('URL lạ thì về màn Quay', () => {
     renderAt('/abc')
-    expect(screen.getByRole('heading', { name: 'Mở nồi' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Nay ăn gì cả nhà?' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Quay' })).toHaveAttribute('aria-current', 'page')
   })
 })

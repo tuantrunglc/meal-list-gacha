@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { ClientResponseError } from 'pocketbase'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { toIsoDate, useCommitTray, useHasDraws, useRecentDraws } from './draws'
+import { toIsoDate, useCommitTray, useDrawHistory, useHasDraws, useRecentDraws } from './draws'
 import { pb } from './pb'
 
 vi.mock('./auth', () => ({ useAuth: () => ({ isAuthenticated: true, userId: 'u1' }) }))
@@ -118,5 +118,25 @@ describe('useCommitTray', () => {
     })
     expect(fake.delete).toHaveBeenCalledWith('oldidoldidoldid')
     expect(fake.create.mock.calls.at(-1)![0].id).toBe('newidnewidnewid')
+  })
+})
+
+describe('useDrawHistory', () => {
+  it('trang 20, mới nhất trước, lọc household + Bộ, tải trang kế tới khi hết', async () => {
+    fake.getList
+      .mockResolvedValueOnce({ items: [{ id: 'd2', chosenAt: '2026-09-26 10:00:00.000Z', entries: [] }], page: 1, totalPages: 2 })
+      .mockResolvedValueOnce({ items: [{ id: 'd1', chosenAt: '2026-09-25 10:00:00.000Z', entries: [] }], page: 2, totalPages: 2 })
+    const { result } = renderHook(() => useDrawHistory('food'), { wrapper })
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(1))
+    const [page, size, opts] = fake.getList.mock.calls[0]
+    expect([page, size]).toEqual([1, 20])
+    expect(opts.sort).toBe('-chosenAt,-created')
+    expect(opts.filter).toContain('household = "h1"')
+    expect(opts.filter).toContain('setKey = "food"')
+    expect(result.current.hasNextPage).toBe(true)
+    await result.current.fetchNextPage()
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(2))
+    expect(result.current.hasNextPage).toBe(false)
+    expect(result.current.data!.pages[0].items[0].chosenAt).toBe('2026-09-26T10:00:00.000Z')
   })
 })

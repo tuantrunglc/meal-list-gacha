@@ -90,6 +90,8 @@ describe('useItems', () => {
     await waitFor(() => expect(result.current.data).toBeDefined())
     expect(fake.create).not.toHaveBeenCalled()
     expect(result.current.data!.map((i) => i.id)).toEqual(['s1'])
+    // `all` giữ cả món đã xoá (cho lịch sử)
+    expect(result.current.all!.map((i) => i.id)).toEqual(['s1', 's2'])
 
     fake.getFullList.mockResolvedValue([record('s1', { deleted: true }), record('s2', { deleted: true })])
     const again = renderHook(() => useItems(seed), { wrapper })

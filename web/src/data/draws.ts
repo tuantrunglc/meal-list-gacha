@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Rarity, RecentDraw } from '../engine'
 import { ClientResponseError } from 'pocketbase'
 import { AppError, isConflict, toAppError } from './errors'
@@ -29,7 +29,15 @@ export function toIsoDate(pbDate: string): string {
 type DrawRecord = { id: string; chosenAt: string; entries: DrawEntry[] }
 
 function toDraw(r: DrawRecord): Draw {
-  const entries = Array.isArray(r.entries) ? r.entries.filter((e) => e && typeof e.itemId === 'string') : []
+  const entries = Array.isArray(r.entries)
+    ? r.entries
+        .filter((e) => e && typeof e.itemId === 'string')
+        .map((e, i) => ({
+          ...e,
+          name: typeof e.name === 'string' ? e.name : '',
+          order: typeof e.order === 'number' && Number.isFinite(e.order) ? e.order : i,
+        }))
+    : []
   return { id: r.id, chosenAt: toIsoDate(r.chosenAt), entries }
 }
 
@@ -60,6 +68,31 @@ export function useRecentDraws(setKey: string, cooldownDays: number) {
         throw toAppError(err)
       }
     },
+  })
+}
+
+const HISTORY_PAGE_SIZE = 20
+
+/** Lịch sử mâm đã chốt của Bộ, mới nhất trước, tải từng trang. */
+export function useDrawHistory(setKey: string) {
+  const household = useCurrentHousehold()
+  const householdId = household.data?.id
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.draws(householdId ?? '', setKey), 'history'],
+    enabled: !!householdId,
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }): Promise<{ items: Draw[]; page: number; totalPages: number }> => {
+      try {
+        const list = await pb.collection('draws').getList<DrawRecord>(pageParam, HISTORY_PAGE_SIZE, {
+          filter: pb.filter('household = {:h} && setKey = {:s}', { h: householdId, s: setKey }),
+          sort: '-chosenAt,-created',
+        })
+        return { items: list.items.map(toDraw), page: list.page, totalPages: list.totalPages }
+      } catch (err) {
+        throw toAppError(err)
+      }
+    },
+    getNextPageParam: (last) => (last.page < last.totalPages ? last.page + 1 : undefined),
   })
 }
 

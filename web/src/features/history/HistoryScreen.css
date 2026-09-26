@@ -1,0 +1,103 @@
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.history__status {
+  padding: var(--space-6) 0;
+  text-align: center;
+  color: var(--color-ink-secondary);
+}
+
+.history__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-row {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.history-row__when {
+  margin-bottom: var(--space-2);
+  color: var(--color-ink-secondary);
+  font-family: var(--text-meta-family);
+  font-size: var(--text-meta-size);
+  font-weight: var(--text-meta-weight);
+}
+
+.history-row__dishes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-row__dish {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 88px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.history-row__dish:focus-visible {
+  outline: 2px solid var(--color-accent-tile);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.history-row__thumb {
+  width: 88px;
+  border-radius: var(--radius-sm);
+}
+
+.history-row__name {
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.history__more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: center;
+  padding: var(--space-3) 0;
+}
+
+.history__close {
+  align-self: flex-end;
+  min-height: 44px;
+  margin-bottom: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-primary);
+  font-family: var(--text-label-family);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  cursor: pointer;
+}

@@ -33,7 +33,7 @@ const cards = () => within(screen.getByRole('list')).getAllByRole('listitem')
 
 describe('LibraryScreen', () => {
   beforeEach(() => {
-    state = { data: items, error: null, isPending: false, isError: false, refetch: vi.fn(async () => {}) }
+    state = { data: items, all: items, error: null, isPending: false, isError: false, refetch: vi.fn(async () => {}) }
   })
 
   it('hiện mọi món, lọc nhóm + mùa bằng chip', () => {

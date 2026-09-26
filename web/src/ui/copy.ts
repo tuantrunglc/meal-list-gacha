@@ -102,6 +102,14 @@ export const copy = {
     stay: 'Ở lại',
     addButton: 'Thêm món',
   },
+  history: {
+    empty: 'Chưa chốt mâm nào. Qua tab Quay mở nồi thử nhé!',
+    loading: 'Đang lật sổ mâm cơm…',
+    more: 'Xem thêm mâm cũ',
+    loadingMore: 'Đang tải thêm…',
+    openDish: (name: string) => `Xem công thức ${name}`,
+    trayLabel: (when: string) => `Mâm ${when}`,
+  },
   screens: {
     library: 'Sổ món của nhà',
     history: 'Mâm đã chốt',

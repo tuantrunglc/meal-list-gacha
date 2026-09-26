@@ -90,7 +90,7 @@ describe('SpinScreen', () => {
     recentState = { isPending: false, fetchStatus: 'idle', error: null }
     onCommitted = undefined
     hasDraws = false
-    state = { data: toItems(), error: null, isPending: false, isError: false, refetch }
+    state = { data: toItems(), all: toItems(), error: null, isPending: false, isError: false, refetch }
   })
 
   afterEach(() => vi.useRealTimers())

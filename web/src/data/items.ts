@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import type { Rarity } from '../engine'
 import { AppError, isConflict, toAppError } from './errors'
 import { useCurrentHousehold } from './household'
@@ -117,6 +118,8 @@ async function fetchAll(householdId: string, setKey: string): Promise<Item[]> {
 
 export type ItemsResult = {
   data: Item[] | undefined
+  /** Cả món đã xoá mềm (cho lịch sử). */
+  all: Item[] | undefined
   error: AppError | null
   isPending: boolean
   isError: boolean
@@ -131,6 +134,7 @@ export function useItems(set: SeedSource): ItemsResult {
   const householdId = household.data?.id
   const query = useQuery<Item[], AppError>({
     queryKey: queryKeys.items(householdId ?? '', setKey),
+    // Cả món đã xoá nằm trong cache; màn nào cần chỉ món đang dùng thì lấy `data`
     enabled: !!householdId,
     queryFn: async () => {
       if (!householdId) throw new AppError('no-household')
@@ -141,17 +145,20 @@ export function useItems(set: SeedSource): ItemsResult {
           await seedSet(householdId, set, existing)
           all = await fetchAll(householdId, setKey)
         }
-        return all.filter((item) => !item.deleted)
+        return all
       } catch (err) {
         throw toAppError(err)
       }
     },
   })
 
+  const active = useMemo(() => query.data?.filter((item) => !item.deleted), [query.data])
+
   // Chưa có household: lỗi (nếu có) và nút thử lại thuộc về bước household
   if (!householdId) {
     return {
       data: undefined,
+      all: undefined,
       error: household.error,
       isPending: !household.error,
       isError: !!household.error,
@@ -159,7 +166,8 @@ export function useItems(set: SeedSource): ItemsResult {
     }
   }
   return {
-    data: query.data,
+    data: active,
+    all: query.data,
     error: query.error,
     isPending: query.isPending,
     isError: query.isError,

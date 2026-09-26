@@ -55,9 +55,9 @@ development_status:
   2-5-xoá-món: review
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-lịch-sử-mâm-đã-chốt: backlog
-  3-2-xoá-mâm-trong-lịch-sử: backlog
+  epic-3: in-progress
+  3-1-lịch-sử-mâm-đã-chốt: review
+  3-2-xoá-mâm-trong-lịch-sử: in-progress
   3-3-cài-đặt-số-ngày-tránh-trùng-và-âm-thanh: backlog
   3-4-khôi-phục-món-mặc-định: backlog
   epic-3-retrospective: optional

@@ -7,8 +7,11 @@ const PB_DIR = './e2e/.pb_data'
 export default defineConfig({
   testDir: './e2e',
   workers: 1,
+  // CI: chạy lại 1 lần test chập chờn, ghi trace lần chạy lại để soi (web/test-results được tải lên khi lỗi)
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: BASE_URL,
+    trace: 'on-first-retry',
     viewport: { width: 390, height: 844 },
     // dùng Chrome cài sẵn trên máy, không cần tải browser của Playwright
     channel: 'chrome',

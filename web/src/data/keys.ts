@@ -3,6 +3,7 @@ export const queryKeys = {
   all: ['noi-than'] as const,
   household: () => [...queryKeys.all, 'household'] as const,
   fileToken: () => [...queryKeys.all, 'file-token'] as const,
+  setConfig: (householdId: string, setKey: string) => [...queryKeys.all, 'set-config', householdId, setKey] as const,
   items: (householdId: string, setKey: string) => [...queryKeys.all, 'items', householdId, setKey] as const,
   draws: (householdId: string, setKey: string) => [...queryKeys.all, 'draws', householdId, setKey] as const,
 }

@@ -8,6 +8,11 @@ vi.mock('../data/household', () => ({
   useCurrentHousehold: () => ({ data: { id: 'h' }, error: null, refetch: vi.fn() }),
 }))
 
+const setConfigMock = vi.hoisted(() => ({ cooldownDays: null as number | null }))
+vi.mock('../data/setConfig', () => ({
+  useSetConfig: () => ({ data: { cooldownDays: setConfigMock.cooldownDays } }),
+  useSaveCooldown: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null, ready: true }),
+}))
 vi.mock('../data/draws', () => ({
   useRecentDraws: () => ({ data: [], isPending: false, fetchStatus: 'idle' }),
   useHasDraws: () => ({ data: false }),

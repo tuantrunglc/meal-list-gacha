@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { useHasDraws, useRecentDraws } from '../../data/draws'
 import { useItems, type Item } from '../../data/items'
+import { useSetConfig } from '../../data/setConfig'
 import { drawSlots, type EngineItem, type Slot } from '../../engine'
 import { DEFAULT_SET_KEY, getSet } from '../../sets/registry'
 import type { SetDefinition } from '../../sets/types'
@@ -28,8 +30,9 @@ export function SpinScreen() {
   const set = getSet(DEFAULT_SET_KEY)
   // Lần đầu mở app: household chưa có món thì nạp món mặc định của Bộ
   const items = useItems(set)
-  // Chưa có set_configs (Story 3.3): dùng số ngày mặc định của Bộ
-  const cooldownDays = set.defaultCooldownDays
+  // Số ngày tránh trùng: cấu hình của nhà (nếu có), không thì mặc định của Bộ (AD-7)
+  const config = useSetConfig(set.setKey)
+  const cooldownDays = config.data?.cooldownDays ?? set.defaultCooldownDays
   const recentDraws = useRecentDraws(set.setKey, cooldownDays)
   const hasDraws = useHasDraws(set.setKey)
   const [committedNote, setCommittedNote] = useState(false)
@@ -103,6 +106,9 @@ export function SpinScreen() {
         <button type="button" className="set-picker" aria-disabled="true">
           {copy.spin.setPicker(set.label)} <span aria-hidden="true">▾</span>
         </button>
+        <Link to="/cai-dat" className="spin-screen__gear" aria-label={copy.settings.open}>
+          <span aria-hidden="true">⚙︎</span>
+        </Link>
       </div>
       <h1 className="spin-screen__greeting">{copy.spin.greeting}</h1>
 
@@ -123,13 +129,13 @@ export function SpinScreen() {
         <GachaPot boiling={spinning} />
       </div>
 
-      {items.error || recentDraws.error ? (
+      {items.error || recentDraws.error || (config.error && !config.data) ? (
         <div className="spin-screen__error" role="alert">
-          <p className="form-error">{(items.error ?? recentDraws.error)!.message}</p>
+          <p className="form-error">{(items.error ?? recentDraws.error ?? config.error)!.message}</p>
           <button
             type="button"
             className="button-secondary"
-            onClick={() => void (items.error ? items.refetch() : recentDraws.refetch())}
+            onClick={() => void (items.error ? items.refetch() : recentDraws.error ? recentDraws.refetch() : config.refetch())}
           >
             {copy.retry}
           </button>
@@ -148,7 +154,7 @@ export function SpinScreen() {
         className="spin-button"
         onClick={spin}
         // Chờ cả danh sách món lẫn mâm gần đây, để luật tránh trùng luôn có hiệu lực
-        disabled={!items.data || (cooldownDays > 0 && !recentDraws.data)}
+        disabled={!items.data || !config.data || (cooldownDays > 0 && !recentDraws.data)}
         aria-disabled={spinning || undefined}
         data-spinning={spinning || undefined}
       >
